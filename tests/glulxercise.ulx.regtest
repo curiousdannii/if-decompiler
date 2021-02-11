@@ -1,0 +1,10 @@
+** game: glulxercise.ulx
+
+* all
+
+Glulxercise: A Glulx interpreter unit test
+Welcome to the test chamber.
+
+> all
+!FAIL
+All tests passed.

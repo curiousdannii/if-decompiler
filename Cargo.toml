@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "glulxtoc",
+]
+
+[profile.release]
+lto = true

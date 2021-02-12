@@ -12,6 +12,8 @@ https://github.com/curiousdannii/if-decompiler
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+use if_decompiler;
+
 mod output;
 
 #[derive(StructOpt)]
@@ -41,8 +43,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Read the storyfile
     let data = std::fs::read(storyfile)?;
 
+    // Decompile the storyfile
+    let mut decompiler = if_decompiler::glulx::GlulxState::new(data.into_boxed_slice());
+    decompiler.decompile_rom();
+
     // Output the C files
-    output::image(&data, out_dir, storyfile_name)?;
+    output::image(&decompiler.image, out_dir, storyfile_name)?;
 
     Ok(())
 }

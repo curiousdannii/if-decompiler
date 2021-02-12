@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "glulxtoc",
+    "if-decompiler",
 ]
 
 [profile.release]

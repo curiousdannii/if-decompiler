@@ -21,7 +21,6 @@ mod opcodes;
 pub struct GlulxState {
     pub image: Box<[u8]>,
     pub functions: FnvHashMap<u32, Function>,
-    pub texts: FnvHashMap<u32, String>,
 }
 
 impl GlulxState {
@@ -29,7 +28,6 @@ impl GlulxState {
         GlulxState {
             image,
             functions: FnvHashMap::default(),
-            texts: FnvHashMap::default(),
         }
     }
 
@@ -42,7 +40,7 @@ pub struct Function {
     pub addr: u32,
     pub safety: FunctionSafety,
     pub argument_mode: FunctionArgumentMode,
-    pub locals: Vec<u8>,
+    pub locals: u32,
     pub instructions: Vec<Instruction>,
 }
 

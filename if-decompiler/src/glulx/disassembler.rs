@@ -55,16 +55,17 @@ impl GlulxState {
         };
 
         // Parse the locals formats
-        let mut locals = Vec::new();
+        let mut locals = 0;
         loop {
             let local_type = cursor.get_u8();
-            let count = cursor.get_u8();
+            let count = cursor.get_u8() as u32;
             if local_type == 0 {
                 break
             }
-            for _ in 0..count {
-                locals.push(local_type);
+            if local_type != 4 {
+                panic!("1 and 2 byte locals are not supported");
             }
+            locals += count;
         }
 
         // Parse the instructions

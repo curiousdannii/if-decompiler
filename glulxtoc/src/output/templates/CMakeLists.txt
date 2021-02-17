@@ -1,0 +1,34 @@
+cmake_minimum_required(VERSION 3.13)
+
+project(NAME)
+
+# Add sources to a target from a specified directory
+function(add_sources target dir)
+    cmake_parse_arguments(PARSE_ARGV 2 ADD "" "" "SRCS")
+    list(TRANSFORM ADD_SRCS PREPEND ${dir})
+    target_sources(${target} PRIVATE ${ADD_SRCS})
+    target_include_directories(${target} PRIVATE ${dir})
+endfunction()
+
+# Cheapglk library
+add_library(cheapglk STATIC)
+add_sources(cheapglk "WORKSPACE/cheapglk/"
+    SRCS cgblorb.c cgdate.c cgfref.c cggestal.c cgmisc.c cgschan.c cgstream.c
+    cgstyle.c cgunicod.c cgwindow.c gi_blorb.c gi_debug.c gi_dispa.c main.c)
+target_compile_options(cheapglk PRIVATE -g -Wall)
+target_include_directories(cheapglk PUBLIC WORKSPACE/cheapglk/)
+
+# Turn Glulxe into a library too
+add_library(glulxe STATIC)
+target_link_libraries(glulxe cheapglk)
+add_sources(glulxe "WORKSPACE/glulxe/"
+    SRCS accel.c float.c gestalt.c)
+target_compile_options(glulxe PRIVATE -Wall -Wmissing-prototypes -Wstrict-prototypes -Wno-unused)
+target_include_directories(glulxe PUBLIC WORKSPACE/glulxe/)
+
+# And now our project
+add_executable(NAME)
+target_link_libraries(NAME cheapglk)
+target_link_libraries(NAME glulxe)
+add_sources(NAME "OUTDIR/"
+    SRCS image.c unixstrt.c)

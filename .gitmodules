@@ -1,0 +1,6 @@
+[submodule "cheapglk"]
+	path = cheapglk
+	url = https://github.com/erkyrath/cheapglk.git
+[submodule "glulxe"]
+	path = glulxe
+	url = https://github.com/erkyrath/glulxe.git

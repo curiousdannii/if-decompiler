@@ -9,6 +9,7 @@ https://github.com/curiousdannii/if-decompiler
 
 */
 
+use std::env;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -29,26 +30,45 @@ struct Cli {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Cli::from_args();
+    // Find where we are running from
+    let mut workspace_dir = env::current_exe()?;
+    workspace_dir.pop();
+    workspace_dir.pop();
+    workspace_dir.pop();
 
     // Process arguments
-    let storyfile = &args.path;
-    let storyfile_name = storyfile.file_name().expect("storyfile should not be relative");
+    let args = Cli::from_args();
+    let mut storyfile_path = env::current_dir()?;
+    storyfile_path.push(args.path);
+    let name = storyfile_path.file_stem().expect("storyfile should not be relative").to_str().unwrap().to_string();
 
-    let out_dir = match &args.out_dir {
-        Some(path) => path.as_path(),
-        None => storyfile.parent().unwrap_or(&storyfile),
+    let out_dir = match args.out_dir {
+        Some(path) => path,
+        None => {
+            let mut path = storyfile_path.clone();
+            let mut name = path.file_name().unwrap().to_os_string();
+            name.push(".decompiled");
+            path.pop();
+            path.push(name);
+            path
+        }
     };
 
     // Read the storyfile
-    let data = std::fs::read(storyfile)?;
+    let data = std::fs::read(storyfile_path)?;
 
     // Decompile the storyfile
     let mut decompiler = if_decompiler::glulx::GlulxState::new(data.into_boxed_slice());
     decompiler.decompile_rom();
 
     // Output the C files
-    output::image(&decompiler.image, out_dir, storyfile_name)?;
+    let output = output::GlulxOutput {
+        name,
+        state: decompiler,
+        out_dir,
+        workspace_dir,
+    };
+    output.output()?;
 
     Ok(())
 }

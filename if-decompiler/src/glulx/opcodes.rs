@@ -160,12 +160,16 @@ pub fn operands_count(opcode: u32, addr: u32) -> usize {
 // Opcode safety codes
 pub fn opcode_safety(opcode: u32, operands: &Vec<Operand>) -> FunctionSafety {
     match opcode {
-        OP_JUMP ..= OP_JLEU | OP_CATCH | OP_THROW | OP_RESTORE
-            | OP_RESTOREUNDO | OP_GLK | OP_JFEQ ..= OP_JISINF => FunctionSafety::SafetyTBD,
+        OP_CATCH | OP_THROW | OP_RESTORE | OP_RESTOREUNDO | OP_GLK => FunctionSafety::SafetyTBD,
         OP_QUIT | OP_RESTART => FunctionSafety::Unsafe,
         // Calls to non-constants are unsafe
         OP_CALL | OP_TAILCALL | OP_CALLF ..= OP_CALLFIII => match operands[0] {
             Operand::Constant(_) => FunctionSafety::SafetyTBD,
+            _ => FunctionSafety::Unsafe,
+        }
+        // Branches to non-constants are unsafe
+        OP_JUMP ..= OP_JLEU | OP_JUMPABS | OP_JFEQ ..= OP_JISINF => match operands.last().unwrap() {
+            Operand::Constant(_) => FunctionSafety::Safe,
             _ => FunctionSafety::Unsafe,
         }
         _ => FunctionSafety::Safe,

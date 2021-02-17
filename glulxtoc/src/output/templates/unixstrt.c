@@ -15,9 +15,7 @@
 /* With glulxtoc the only argument is the number of undo states.
 */
 glkunix_argumentlist_t glkunix_arguments[] = {
-
   { "--undo", glkunix_arg_ValueFollows, "Number of undo states to store." },
-
   { NULL, glkunix_arg_End, NULL }
 };
 
@@ -33,7 +31,6 @@ int glkunix_startup_code(glkunix_startup_t *data)
      and the library-specific ones stripped out.
      As usual for Unix, the zeroth argument is the executable name. */
   for (ix=1; ix<data->argc; ix++) {
-
     if (!strcmp(data->argv[ix], "--undo")) {
       ix++;
       if (ix<data->argc) {
@@ -46,10 +43,9 @@ int glkunix_startup_code(glkunix_startup_t *data)
       }
       continue;
     }
-
   }
 
-  gamefile = glk_stream_open_memory(GLULX_IMAGE, GLULX_IMAGE_LENGTH, FALSE, 1);
+  gamefile = glk_stream_open_memory(GLULX_IMAGE, GLULX_IMAGE_LENGTH, filemode_Read, 1);
   if (!gamefile) {
     init_err = "The game file could not be opened.";
     return TRUE;
@@ -63,11 +59,10 @@ int glkunix_startup_code(glkunix_startup_t *data)
     init_err = "The data in this stand-alone game is too short to read.";
     return TRUE;
   }
-    
+
   if (buf[0] == 'G' && buf[1] == 'l' && buf[2] == 'u' && buf[3] == 'l') {
     /* Load game directly from file. */
     locate_gamefile(FALSE);
-
     return TRUE;
   }
   else if (buf[0] == 'F' && buf[1] == 'O' && buf[2] == 'R' && buf[3] == 'M'

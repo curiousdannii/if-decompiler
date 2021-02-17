@@ -20,15 +20,16 @@ target_include_directories(cheapglk PUBLIC WORKSPACE/cheapglk/)
 
 # Turn Glulxe into a library too
 add_library(glulxe STATIC)
-target_link_libraries(glulxe cheapglk)
+target_link_libraries(glulxe cheapglk m)
 add_sources(glulxe "WORKSPACE/glulxe/"
-    SRCS accel.c float.c gestalt.c)
+    SRCS accel.c files.c float.c funcs.c gestalt.c glkop.c heap.c main.c
+    operand.c osdepend.c profile.c search.c serial.c string.c vm.c)
+target_compile_definitions(glulxe PRIVATE OS_UNIX)
 target_compile_options(glulxe PRIVATE -Wall -Wmissing-prototypes -Wstrict-prototypes -Wno-unused)
 target_include_directories(glulxe PUBLIC WORKSPACE/glulxe/)
 
 # And now our project
 add_executable(NAME)
-target_link_libraries(NAME cheapglk)
-target_link_libraries(NAME glulxe)
+target_link_libraries(NAME cheapglk glulxe)
 add_sources(NAME "OUTDIR/"
-    SRCS image.c unixstrt.c)
+    SRCS exec.c image.c unixstrt.c)

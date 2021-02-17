@@ -15,6 +15,7 @@ impl GlulxOutput {
     pub fn output_from_templates(&self) -> std::io::Result<()> {
         let templates = [
             "CMakeLists.txt",
+            "exec.c",
             "glulxtoc.h",
             "unixstrt.c",
         ];

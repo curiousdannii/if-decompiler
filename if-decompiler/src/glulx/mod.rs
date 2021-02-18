@@ -93,3 +93,14 @@ pub enum Operand {
     Local(u32),
     RAM(u32),
 }
+
+pub enum DecodingNode {
+    Branch(DecodingNodeBranch),
+    Leaf,
+    Terminator,
+}
+
+pub struct DecodingNodeBranch {
+    pub left: u32,
+    pub right: u32,
+}

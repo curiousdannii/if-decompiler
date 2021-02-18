@@ -18,7 +18,7 @@ impl GlulxState {
         let mut cursor = Cursor::new(&self.image);
 
         cursor.set_position(8);
-        let ram_start = 1000; //cursor.get_u32() as u64;
+        let ram_start = cursor.get_u32() as u64;
         // Start from the same place as glulxdump
         cursor.set_position(56);
 
@@ -105,14 +105,14 @@ impl GlulxState {
             }
         }
 
-        // Calculate basic blocks
-
         Function {
             addr,
             safety: opcodes::function_safety(&instructions),
             argument_mode,
             locals,
             instructions,
+            entry_points,
+            exit_points,
         }
     }
 

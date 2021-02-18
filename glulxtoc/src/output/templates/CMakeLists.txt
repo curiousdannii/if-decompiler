@@ -12,21 +12,21 @@ endfunction()
 
 # Cheapglk library
 add_library(cheapglk STATIC)
-add_sources(cheapglk "WORKSPACE/cheapglk/"
+add_sources(cheapglk "WORKSPACE/upstream/cheapglk/"
     SRCS cgblorb.c cgdate.c cgfref.c cggestal.c cgmisc.c cgschan.c cgstream.c
     cgstyle.c cgunicod.c cgwindow.c gi_blorb.c gi_debug.c gi_dispa.c main.c)
 target_compile_options(cheapglk PRIVATE -g -Wall)
-target_include_directories(cheapglk PUBLIC WORKSPACE/cheapglk/)
+target_include_directories(cheapglk PUBLIC WORKSPACE/upstream/cheapglk/)
 
 # Turn Glulxe into a library too
 add_library(glulxe STATIC)
 target_link_libraries(glulxe cheapglk m)
-add_sources(glulxe "WORKSPACE/glulxe/"
+add_sources(glulxe "WORKSPACE/upstream/glulxe/"
     SRCS accel.c files.c float.c funcs.c gestalt.c glkop.c heap.c main.c
     operand.c osdepend.c profile.c search.c serial.c string.c vm.c)
 target_compile_definitions(glulxe PRIVATE OS_UNIX)
 target_compile_options(glulxe PRIVATE -Wall -Wmissing-prototypes -Wstrict-prototypes -Wno-unused)
-target_include_directories(glulxe PUBLIC WORKSPACE/glulxe/)
+target_include_directories(glulxe PUBLIC WORKSPACE/upstream/glulxe/)
 
 # And now our project
 add_executable(NAME)

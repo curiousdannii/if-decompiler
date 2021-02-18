@@ -32,4 +32,4 @@ target_include_directories(glulxe PUBLIC WORKSPACE/upstream/glulxe/)
 add_executable(NAME)
 target_link_libraries(NAME cheapglk glulxe)
 add_sources(NAME "OUTDIR/"
-    SRCS exec.c image.c unixstrt.c)
+    SRCS exec.c functions_safe.c image.c unixstrt.c)

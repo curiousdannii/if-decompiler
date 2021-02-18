@@ -11,7 +11,9 @@ https://github.com/curiousdannii/if-decompiler
 
 use std::io::prelude::*;
 
-use if_decompiler;
+use if_decompiler::*;
+use glulx::*;
+use glulx::opcodes;
 
 use super::*;
 
@@ -33,7 +35,7 @@ impl GlulxOutput {
         // Output the function bodies
         let mut safe_funcs = Vec::default();
         for (addr, function) in &self.state.functions {
-            if function.safety == if_decompiler::FunctionSafety::Unsafe {
+            if function.safety == FunctionSafety::Unsafe {
                 continue;
             }
 
@@ -41,10 +43,13 @@ impl GlulxOutput {
             let args_list = function_arguments(function.locals);
             let function_spec = format!("glui32 VM_FUNC_{}({})", addr, args_list);
 
-            write!(code_file, "{} {{
-}}
+            writeln!(code_file, "{} {{", function_spec)?;
+            for instruction in &function.instructions {
+                writeln!(code_file, "    {}", self.output_instruction(instruction))?;
+            }
+            writeln!(code_file, "}}
+")?;
 
-", function_spec)?;
             // And the header declaration
             writeln!(header_file, "extern glui32 VM_FUNC_{}({});", addr, args_list)?;
         }
@@ -68,6 +73,64 @@ impl GlulxOutput {
 }}")?;
 
         Ok(())
+    }
+
+    // Output an instruction
+    fn output_instruction(&self, instruction: &Instruction) -> String {
+        let operands = self.map_operands(instruction);
+        let null = String::from("null");
+        let op_a = operands.get(0).unwrap_or(&null);
+        let op_b = operands.get(1).unwrap_or(&null);
+        use opcodes::*;
+        let body = match instruction.opcode {
+            OP_NOP => String::new(),
+            OP_ADD => self.args_join(operands, " + "),
+            OP_SUB => self.args_join(operands, " - "),
+            OP_MUL => self.args_join(operands, " * "),
+            // OP_DIV
+            // OP_MOD
+            // OP_NEG
+            OP_BITAND => self.args_join(operands, " & "),
+            OP_BITOR => self.args_join(operands, " | "),
+            OP_BITXOR => self.args_join(operands, " ^ "),
+            OP_BITNOT => format!("~{}", op_a),
+
+            OP_RETURN => format!("return {}", op_a),
+            _ => String::new(),
+        };
+        format!("/* {}/{} */ {};", instruction.opcode, instruction.addr, body)
+    }
+
+    // Map operands into strings
+    fn map_operands(&self, instruction: &Instruction) -> Vec<String> {
+        use Storer::*;
+        match opcodes::instruction_stores(instruction.opcode)
+        {
+            DoesNotStore => &instruction.operands[..],
+            LastOperand => &instruction.operands[..(instruction.operands.len() - 1)],
+            FirstOperand => &instruction.operands[1..],
+            LastTwoOperands => &instruction.operands[..(instruction.operands.len() - 2)],
+        }.iter().map(|&operand| self.output_operand(operand)).collect()
+    }
+
+    fn output_operand(&self, operand: Operand) -> String {
+        use Operand::*;
+        match operand {
+            Constant(val) => val.to_string(),
+            Memory(addr) => format!("Mem4({})", addr),
+            Stack => String::from("TODOSTACK"),
+            Local(val) => format!("l{}", val / 4),
+            RAM(_addr) => String::from("TODORAM"),
+        }
+    }
+
+    fn args_join(&self, operands: Vec<String>, joiner: &str) -> String {
+        match operands.len() {
+            0 => String::new(),
+            1 => format!("{}", operands[0]),
+            2 => format!("{}{}{}", operands[0], joiner, operands[1]),
+            _ => operands.join(joiner),
+        }
     }
 }
 

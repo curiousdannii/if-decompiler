@@ -17,7 +17,7 @@ use fnv::FnvHashSet;
 use super::*;
 
 mod disassembler;
-mod opcodes;
+pub mod opcodes;
 
 pub struct GlulxState {
     pub image: Box<[u8]>,
@@ -86,12 +86,21 @@ pub struct Instruction {
     pub branch: Option<BranchTarget>,
 }
 
+#[derive(Copy, Clone)]
 pub enum Operand {
     Constant(i32),
     Memory(u32),
     Stack,
     Local(u32),
     RAM(u32),
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum Storer {
+    DoesNotStore,
+    LastOperand,
+    FirstOperand,
+    LastTwoOperands,
 }
 
 pub enum DecodingNode {

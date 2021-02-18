@@ -15,3 +15,6 @@ extern int VM_FUNC_IS_SAFE(glui32 addr);
 // image.c
 #define GLULX_IMAGE_LENGTH IMAGE_LENGTH_VALUE
 extern unsigned char *GLULX_IMAGE;
+
+#define TODORAM 0
+#define TODOSTACK 0

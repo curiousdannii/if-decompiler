@@ -165,6 +165,15 @@ pub fn instruction_branches(opcode: u32) -> bool {
     }
 }
 
+// Whether an instruction halts rather than continuing at the next byte
+pub fn instruction_halts(opcode: u32) -> bool {
+    match opcode {
+        OP_JUMP | OP_RETURN | OP_THROW | OP_TAILCALL | OP_JUMPABS | OP_QUIT
+            | OP_RESTART => true,
+        _ => false,
+    }
+}
+
 // Return the FunctionSafety for a function's instructions
 pub fn function_safety(instructions: &Vec<Instruction>) -> FunctionSafety {
     for instruction in instructions {

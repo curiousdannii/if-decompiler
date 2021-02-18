@@ -168,7 +168,6 @@ impl GlulxState {
     }
 
     fn disassemble_function(&self, cursor: &mut Cursor<&Box<[u8]>>, addr: u32, function_mode: u8) -> Function {
-        println!("function addr {}", addr);
         let argument_mode = match function_mode {
             0xC0 => FunctionArgumentMode::Stack,
             0xC1 => FunctionArgumentMode::Locals,
@@ -196,25 +195,36 @@ impl GlulxState {
 
         // Parse the instructions
         let mut instructions = Vec::new();
-        loop {
-            match self.disassemble_instruction(cursor) {
-                Some(instruction) => {
-                    // If this instruction branches, then update the entry and exit points
-                    match instruction.branch {
-                        None => {},
-                        Some(target) => {
-                            exit_points.insert(instruction.addr);
-                            match target {
-                                BranchTarget::Absolute(addr) => {
-                                    entry_points.insert(addr);
-                                },
-                                _ => {},
-                            }
+        let mut instruction_addresses = FnvHashSet::default();
+        'parse_loop: loop {
+            let instruction = self.disassemble_instruction(cursor);
+            instruction_addresses.insert(instruction.addr);
+            // If this instruction branches, then update the entry and exit points
+            match instruction.branch {
+                None => {},
+                Some(target) => {
+                    exit_points.insert(instruction.addr);
+                    match target {
+                        BranchTarget::Absolute(addr) => {
+                            entry_points.insert(addr);
                         },
-                    };
-                    instructions.push(instruction);
+                        _ => {},
+                    }
                 },
-                None => break,
+            };
+            let opcode = instruction.opcode;
+            instructions.push(instruction);
+
+            if opcodes::instruction_halts(opcode) {
+                // Stop parsing instructions if we don't have any pending entry_points
+                // Short cut - check if the next address is an entry point
+                if !entry_points.contains(&(cursor.position() as u32)) {
+                    // Otherwise check if any entry points haven't already been parsed
+                    for _ in entry_points.difference(&instruction_addresses) {
+                        continue 'parse_loop;
+                    }
+                    break;
+                }
             }
         }
 
@@ -229,14 +239,9 @@ impl GlulxState {
         }
     }
 
-    fn disassemble_instruction(&self, cursor: &mut Cursor<&Box<[u8]>>) -> Option<Instruction> {
+    fn disassemble_instruction(&self, cursor: &mut Cursor<&Box<[u8]>>) -> Instruction {
         let addr = cursor.position() as u32;
         let opcode_byte = cursor.get_u8();
-
-        // There's no explicit end to a function, so bail if we find a byte that looks like the beginning of a new object
-        if let 0xC0 | 0xC1 | 0xE0 | 0xE1 | 0xE2 = opcode_byte {
-            return None
-        }
 
         // Unpack the variable length opcode
         let opcode = match opcode_byte {
@@ -289,7 +294,7 @@ impl GlulxState {
                                 BranchTarget::Return(target)
                             }
                             else {
-                                BranchTarget::Absolute((addr as i32 + target - 2) as u32)
+                                BranchTarget::Absolute((cursor.position() as i32 + target - 2) as u32)
                             }
                         }
                     },
@@ -298,11 +303,11 @@ impl GlulxState {
             },
         };
 
-        Some(Instruction {
+        Instruction {
             addr,
             opcode,
             operands,
             branch,
-        })
+        }
     }
 }

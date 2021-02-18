@@ -9,6 +9,8 @@ https://github.com/curiousdannii/if-decompiler
 
 */
 
+use fnv::FnvHashSet;
+
 use super::*;
 
 impl GlulxState {
@@ -34,10 +36,18 @@ impl GlulxState {
                     self.functions.insert(addr, self.disassemble_function(&mut cursor, addr, object_type));
                 },
 
-                // Strings
-                0xE0 => {},
+                // Strings - just skip past them for now!
+                0xE0 => {
+                    while cursor.get_u8() != 0 {};
+                },
+                0xE2 => {
+                    cursor.get_u8();
+                    cursor.get_u8();
+                    cursor.get_u8();
+                    while cursor.get_u32() != 0 {};
+                },
+                // Compressed strings will take a bit more work...
                 0xE1 => {},
-                0xE2 => {},
 
                 // Unknown
                 _ => {},
@@ -46,8 +56,6 @@ impl GlulxState {
     }
 
     fn disassemble_function(&self, cursor: &mut Cursor<&Box<[u8]>>, addr: u32, function_mode: u8) -> Function {
-        let mut safety = FunctionSafety::Safe;
-
         let argument_mode = match function_mode {
             0xC0 => FunctionArgumentMode::Stack,
             0xC1 => FunctionArgumentMode::Locals,
@@ -68,34 +76,48 @@ impl GlulxState {
             locals += count;
         }
 
+        // Basic blocks
+        let mut entry_points = FnvHashSet::default();
+        entry_points.insert(cursor.position() as u32);
+        let mut exit_points = FnvHashSet::default();
+
         // Parse the instructions
         let mut instructions = Vec::new();
         loop {
-            match self.disassemble_instruction(cursor, addr) {
+            match self.disassemble_instruction(cursor) {
                 Some(instruction) => {
-                    // Update function safety from instruction safety - can only become less safe
-                    if safety == FunctionSafety::Safe {
-                        safety = instruction.safety;
-                    }
-                    else if safety == FunctionSafety::SafetyTBD && instruction.safety == FunctionSafety::Unsafe {
-                        safety = FunctionSafety::Unsafe;
-                    }
+                    // If this instruction branches, then update the entry and exit points
+                    match instruction.branch {
+                        None => {},
+                        Some(target) => {
+                            exit_points.insert(instruction.addr);
+                            match target {
+                                BranchTarget::Absolute(addr) => {
+                                    entry_points.insert(addr);
+                                },
+                                _ => {},
+                            }
+                        },
+                    };
                     instructions.push(instruction);
                 },
                 None => break,
             }
         }
 
+        // Calculate basic blocks
+
         Function {
             addr,
-            safety,
+            safety: opcodes::function_safety(&instructions),
             argument_mode,
             locals,
             instructions,
         }
     }
 
-    fn disassemble_instruction(&self, cursor: &mut Cursor<&Box<[u8]>>, addr: u32) -> Option<Instruction> {
+    fn disassemble_instruction(&self, cursor: &mut Cursor<&Box<[u8]>>) -> Option<Instruction> {
+        let addr = cursor.position() as u32;
         let opcode_byte = cursor.get_u8();
 
         // There's no explicit end to a function, so bail if we find a byte that looks like the beginning of a new object
@@ -140,12 +162,34 @@ impl GlulxState {
             operands.push(operand);
         }
 
-        let safety = opcodes::opcode_safety(opcode, &operands);
+        // Calculate branch targets
+        let branch = match opcodes::instruction_branches(opcode) {
+            false => None,
+            true => {
+                Some(match *operands.last().unwrap() {
+                    Operand::Constant(target) => {
+                        if opcode == opcodes::OP_JUMPABS {
+                            BranchTarget::Absolute(target as u32)
+                        }
+                        else {
+                            if target == 0 || target == 1 {
+                                BranchTarget::Return(target)
+                            }
+                            else {
+                                BranchTarget::Absolute((addr as i32 + target - 2) as u32)
+                            }
+                        }
+                    },
+                    _ => BranchTarget::Dynamic,
+                })
+            },
+        };
+
         Some(Instruction {
             addr,
             opcode,
             operands,
-            safety,
+            branch,
         })
     }
 }

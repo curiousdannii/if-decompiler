@@ -53,7 +53,7 @@ pub struct Instruction {
     pub addr: u32,
     pub opcode: u32,
     pub operands: Vec<Operand>,
-    pub safety: FunctionSafety,
+    pub branch: Option<BranchTarget>,
 }
 
 pub enum Operand {

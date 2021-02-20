@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 bytes = "1.0.1"
 fnv = "1.0.7"
+petgraph = "0.5.1"

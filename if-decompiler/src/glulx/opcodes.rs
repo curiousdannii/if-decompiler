@@ -165,6 +165,14 @@ pub fn instruction_branches(opcode: u32) -> bool {
     }
 }
 
+// Whether an instruction calls
+pub fn instruction_calls(opcode: u32) -> bool {
+    match opcode {
+        OP_CALL | OP_TAILCALL | OP_CALLF ..= OP_CALLFIII => true,
+        _ => false,
+    }
+}
+
 // Whether an instruction halts rather than continuing at the next byte
 pub fn instruction_halts(opcode: u32) -> bool {
     match opcode {

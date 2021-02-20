@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use if_decompiler::glulx::GlulxState;
 
 mod functions_safe;
+mod functions_unsafe;
 mod image;
 mod templates;
 
@@ -31,9 +32,10 @@ impl GlulxOutput {
         // Make the output directory if necessary
         fs::create_dir_all(&self.out_dir)?;
 
-        self.output_safe_functions()?;
         self.output_from_templates()?;
         self.output_image()?;
+        self.output_safe_functions()?;
+        self.output_unsafe_functions()?;
         Ok(())
     }
 

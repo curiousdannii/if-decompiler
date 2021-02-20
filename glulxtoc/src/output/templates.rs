@@ -10,9 +10,12 @@ https://github.com/curiousdannii/if-decompiler
 */
 
 use super::*;
+use std::time::Instant;
 
 impl GlulxOutput {
     pub fn output_from_templates(&self) -> std::io::Result<()> {
+        let start = Instant::now();
+
         let templates = [
             "CMakeLists.txt",
             "exec.c",
@@ -43,6 +46,8 @@ impl GlulxOutput {
             fs::write(output_path, file)?;
         }
 
+        let duration = start.elapsed();
+        println!("Time outputting files from templates: {:?}", duration);
         Ok(())
     }
 }

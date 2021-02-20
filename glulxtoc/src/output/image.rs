@@ -10,11 +10,14 @@ https://github.com/curiousdannii/if-decompiler
 */
 
 use std::io::prelude::*;
+use std::time::Instant;
 
 use super::*;
 
 impl GlulxOutput {
     pub fn output_image(&self) -> std::io::Result<()> {
+        let start = Instant::now();
+
         let mut file = self.make_file("image.c")?;
 
         writeln!(file, "char GLULX_IMAGE[] = {{")?;
@@ -27,6 +30,8 @@ impl GlulxOutput {
 
         write!(file, "}};")?;
 
+        let duration = start.elapsed();
+        println!("Time outputting image.c: {:?}", duration);
         Ok(())
     }
 }

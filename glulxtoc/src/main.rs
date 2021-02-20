@@ -56,13 +56,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Read the storyfile
+    let start = Instant::now();
     let data = std::fs::read(storyfile_path)?;
 
     // Decompile the storyfile
-    let start = Instant::now();
+    let start_disassemble = Instant::now();
     let mut decompiler = if_decompiler::glulx::GlulxState::new(data.into_boxed_slice());
     decompiler.decompile_rom();
-    let duration = start.elapsed();
+    let duration = start_disassemble.elapsed();
     println!("Time disassembling the storyfile: {:?}", duration);
 
     // Output the C files
@@ -73,6 +74,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         workspace_dir,
     };
     output.output()?;
+
+    let duration = start.elapsed();
+    println!("Total decompilation time: {:?}", duration);
 
     Ok(())
 }

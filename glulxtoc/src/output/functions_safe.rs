@@ -10,6 +10,7 @@ https://github.com/curiousdannii/if-decompiler
 */
 
 use std::io::prelude::*;
+use std::time::Instant;
 
 use if_decompiler::*;
 use glulx::*;
@@ -19,6 +20,8 @@ use super::*;
 
 impl GlulxOutput {
     pub fn output_safe_functions(&self) -> std::io::Result<()> {
+        let start = Instant::now();
+
         let mut code_file = self.make_file("functions_safe.c")?;
         let mut header_file = self.make_file("functions_safe.h")?;
 
@@ -72,6 +75,8 @@ impl GlulxOutput {
     }}
 }}")?;
 
+        let duration = start.elapsed();
+        println!("Time outputting safe functions: {:?}", duration);
         Ok(())
     }
 

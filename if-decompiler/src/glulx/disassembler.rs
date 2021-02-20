@@ -240,6 +240,8 @@ impl GlulxState {
     }
 
     fn disassemble_instruction(&self, cursor: &mut Cursor<&Box<[u8]>>) -> Instruction {
+        use Operand::*;
+
         let addr = cursor.position() as u32;
         let opcode_byte = cursor.get_u8();
 
@@ -261,20 +263,20 @@ impl GlulxState {
         }
         for i in 0..operands_count {
             let operand = match operand_types[i] {
-                0 => Operand::Constant(0),
-                1 => Operand::Constant(cursor.get_i8() as i32),
-                2 => Operand::Constant(cursor.get_i16() as i32),
-                3 => Operand::Constant(cursor.get_i32()),
-                5 => Operand::Memory(cursor.get_u8() as u32),
-                6 => Operand::Memory(cursor.get_u16() as u32),
-                7 => Operand::Memory(cursor.get_u32()),
-                8 => Operand::Stack,
-                9 => Operand::Local(cursor.get_u8() as u32),
-                10 => Operand::Local(cursor.get_u16() as u32),
-                11 => Operand::Local(cursor.get_u32()),
-                13 => Operand::RAM(cursor.get_u8() as u32),
-                14 => Operand::RAM(cursor.get_u16() as u32),
-                15 => Operand::RAM(cursor.get_u32()),
+                0 => Constant(0),
+                1 => Constant(cursor.get_i8() as i32 as u32),
+                2 => Constant(cursor.get_i16() as i32 as u32),
+                3 => Constant(cursor.get_u32()),
+                5 => Memory(cursor.get_u8() as u32),
+                6 => Memory(cursor.get_u16() as u32),
+                7 => Memory(cursor.get_u32()),
+                8 => Stack,
+                9 => Local(cursor.get_u8() as u32),
+                10 => Local(cursor.get_u16() as u32),
+                11 => Local(cursor.get_u32()),
+                13 => RAM(cursor.get_u8() as u32),
+                14 => RAM(cursor.get_u16() as u32),
+                15 => RAM(cursor.get_u32()),
                 x => panic!("Invalid operand mode {} in instruction {}", x, addr),
             };
             operands.push(operand);
@@ -285,16 +287,16 @@ impl GlulxState {
             false => None,
             true => {
                 Some(match *operands.last().unwrap() {
-                    Operand::Constant(target) => {
+                    Constant(target) => {
                         if opcode == opcodes::OP_JUMPABS {
-                            BranchTarget::Absolute(target as u32)
+                            BranchTarget::Absolute(target)
                         }
                         else {
                             if target == 0 || target == 1 {
                                 BranchTarget::Return(target)
                             }
                             else {
-                                BranchTarget::Absolute((cursor.position() as i32 + target - 2) as u32)
+                                BranchTarget::Absolute((cursor.position() as i32 + target as i32 - 2) as u32)
                             }
                         }
                     },

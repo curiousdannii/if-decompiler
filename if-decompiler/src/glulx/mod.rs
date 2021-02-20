@@ -88,7 +88,7 @@ pub struct Instruction {
 
 #[derive(Copy, Clone)]
 pub enum Operand {
-    Constant(i32),
+    Constant(u32),
     Memory(u32),
     Stack,
     Local(u32),

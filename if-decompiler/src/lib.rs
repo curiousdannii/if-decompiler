@@ -24,5 +24,5 @@ pub enum FunctionSafety {
 pub enum BranchTarget {
     Dynamic,
     Absolute(u32),
-    Return(i32),
+    Return(u32),
 }

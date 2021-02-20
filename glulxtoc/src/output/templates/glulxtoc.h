@@ -21,9 +21,8 @@ extern void VM_UNSAFE_FUNCS(void);
 #define GLULX_IMAGE_LENGTH IMAGE_LENGTH_VALUE
 extern unsigned char *GLULX_IMAGE;
 
-#define TODORAM 0
-#define TODOSTACK 0
-
 // runtime.c
 extern glui32 OP_DIV(glui32 arg1, glui32 arg2);
 extern glui32 OP_MOD(glui32 arg1, glui32 arg2);
+extern glui32 PopStack(void);
+extern void PushStack(glui32 storeval);

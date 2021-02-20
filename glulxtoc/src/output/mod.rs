@@ -22,8 +22,9 @@ mod templates;
 
 pub struct GlulxOutput {
     pub name: String,
-    pub state: GlulxState,
     pub out_dir: PathBuf,
+    pub ramstart: u32,
+    pub state: GlulxState,
     pub workspace_dir: PathBuf,
 }
 

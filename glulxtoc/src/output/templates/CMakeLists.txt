@@ -34,3 +34,4 @@ target_link_libraries(NAME cheapglk glulxe)
 add_sources(NAME "OUTDIR/"
     SRCS exec.c functions_safe.c functions_unsafe.c image.c runtime.c
     unixstrt.c)
+target_compile_options(glulxe PRIVATE -Wall -Wmissing-prototypes -Wstrict-prototypes -Wno-unused)

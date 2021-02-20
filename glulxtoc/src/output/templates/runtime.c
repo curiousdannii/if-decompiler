@@ -71,3 +71,19 @@ glui32 OP_MOD(glui32 arg1, glui32 arg2) {
     }
     return value;
 }
+
+glui32 PopStack(void) {
+    if (stackptr < valstackbase+4) {
+        fatal_error("Stack underflow in operand.");
+    }
+    stackptr -= 4;
+    return Stk4(stackptr);
+}
+
+void PushStack(glui32 storeval) {
+    if (stackptr+4 > stacksize) {
+        fatal_error("Stack overflow in store operand.");
+    }
+    StkW4(stackptr, storeval);
+    stackptr += 4;
+}

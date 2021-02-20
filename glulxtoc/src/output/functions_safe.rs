@@ -28,6 +28,7 @@ impl GlulxOutput {
         // Output the headers
         write!(code_file, "#include \"functions_safe.h\"
 #include \"glk.h\"
+#include \"glulxe.h\"
 #include \"glulxtoc.h\"
 
 ")?;
@@ -82,12 +83,13 @@ impl GlulxOutput {
 
     // Output an instruction
     fn output_instruction(&self, instruction: &Instruction) -> String {
+        let opcode = instruction.opcode;
         let operands = self.map_operands(instruction);
-        let null = String::from("null");
+        let null = String::from("0");
         let op_a = operands.get(0).unwrap_or(&null);
         let op_b = operands.get(1).unwrap_or(&null);
         use opcodes::*;
-        let body = match instruction.opcode {
+        let body = match opcode {
             OP_NOP => String::new(),
             OP_ADD => self.args_join(operands, " + "),
             OP_SUB => self.args_join(operands, " - "),
@@ -101,9 +103,17 @@ impl GlulxOutput {
             OP_BITNOT => format!("~{}", op_a),
 
             OP_RETURN => format!("return {}", op_a),
-            _ => String::new(),
+            _ => String::from("0"),
         };
-        format!("/* {}/{} */ {};", instruction.opcode, instruction.addr, body)
+        use glulx::Storer::*;
+        let body_with_storer = match instruction_stores(opcode) {
+            DoesNotStore => body,
+            LastOperand => self.output_storer(*instruction.operands.last().unwrap(), body),
+            FirstOperand => self.output_storer(instruction.operands[0], body),
+            // TODO!
+            LastTwoOperands => body,
+        };
+        format!("/* {}/{} */ {};", instruction.opcode, instruction.addr, body_with_storer)
     }
 
     // Map operands into strings
@@ -123,9 +133,20 @@ impl GlulxOutput {
         match operand {
             Constant(val) => val.to_string(),
             Memory(addr) => format!("Mem4({})", addr),
-            Stack => String::from("TODOSTACK"),
+            Stack => String::from("PopStack()"),
             Local(val) => format!("l{}", val / 4),
-            RAM(_addr) => String::from("TODORAM"),
+            RAM(addr) => format!("Mem4({})", addr + self.ramstart),
+        }
+    }
+
+    fn output_storer(&self, storer: Operand, inner: String) -> String {
+        use Operand::*;
+        match storer {
+            Constant(_) => String::new(),
+            Memory(addr) => format!("MemW4({}, {})", addr, inner),
+            Stack => format!("PushStack({})", inner),
+            Local(val) => format!("l{} = {}", val / 4, inner),
+            RAM(addr) => format!("MemW4({}, {})", addr + self.ramstart, inner),
         }
     }
 

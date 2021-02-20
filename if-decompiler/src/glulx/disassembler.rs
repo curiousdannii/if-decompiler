@@ -18,22 +18,19 @@ impl GlulxState {
     pub fn disassemble(&mut self) -> DisassemblyGraph {
         let decoding_table = self.parse_string_decoding_table();
 
-        let mut cursor = Cursor::new(&self.image);
-        cursor.set_position(28);
-        let decoding_table_addr = cursor.get_u32() as u64;
-        cursor.set_position(decoding_table_addr + 8);
-        let root_node_addr = cursor.get_u32();
-
-        cursor.set_position(8);
-        let ram_start = cursor.get_u32() as u64;
-        // Start from the same place as glulxdump
-        cursor.set_position(56);
-
         let mut graph = DisassemblyGraph {
             edges: FnvHashSet::default(),
             graph: Graph::new(),
             unsafe_functions: Vec::new(),
         };
+
+        let ram_start = self.read_addr(8) as u64;
+        let decoding_table_addr = self.read_addr(28);
+        let root_node_addr = self.read_addr(decoding_table_addr + 8);
+
+        let mut cursor = Cursor::new(&self.image);
+        // Start from the same place as glulxdump
+        cursor.set_position(56);
 
         // Loop through the ROM
         while cursor.position() < ram_start {
@@ -118,14 +115,13 @@ impl GlulxState {
     pub fn parse_string_decoding_table(&self) -> FnvHashMap<u32, DecodingNode> {
         let mut table = FnvHashMap::default();
         let mut cursor = Cursor::new(&self.image);
-        cursor.set_position(28);
-        let decoding_table_addr = cursor.get_u32() as u64;
-        cursor.set_position(decoding_table_addr + 8);
-        let root_node = cursor.get_u32();
+
+        let decoding_table_addr = self.read_addr(28);
+        let root_node_addr = self.read_addr(decoding_table_addr + 8);
 
         // Keep a list of nodes to process and loop through
         // I tried doing this recursively but couldn't make it work with the borrow checker
-        let mut nodes_to_process = vec![root_node];
+        let mut nodes_to_process = vec![root_node_addr];
         loop {
             let addr = nodes_to_process.pop().unwrap();
             cursor.set_position(addr as u64);

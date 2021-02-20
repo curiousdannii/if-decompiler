@@ -36,6 +36,12 @@ impl GlulxState {
         let graph = self.disassemble();
         self.walk_function_graph(graph);
     }
+
+    pub fn read_addr(&self, addr: u32) -> u32 {
+        let mut cursor = Cursor::new(&self.image);
+        cursor.set_position(addr as u64);
+        cursor.get_u32()
+    }
 }
 
 impl VirtualMachine for GlulxState {

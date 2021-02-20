@@ -92,8 +92,8 @@ impl GlulxOutput {
             OP_ADD => self.args_join(operands, " + "),
             OP_SUB => self.args_join(operands, " - "),
             OP_MUL => self.args_join(operands, " * "),
-            // OP_DIV
-            // OP_MOD
+            OP_DIV => self.runtime("OP_DIV", operands),
+            OP_MOD => self.runtime("OP_MOD", operands),
             // OP_NEG
             OP_BITAND => self.args_join(operands, " & "),
             OP_BITOR => self.args_join(operands, " | "),
@@ -129,13 +129,22 @@ impl GlulxOutput {
         }
     }
 
-    fn args_join(&self, operands: Vec<String>, joiner: &str) -> String {
+    // And some functions which can be used by functions_unsafe.rs too
+    pub fn args_join(&self, operands: Vec<String>, joiner: &str) -> String {
         match operands.len() {
             0 => String::new(),
             1 => format!("{}", operands[0]),
             2 => format!("{}{}{}", operands[0], joiner, operands[1]),
             _ => operands.join(joiner),
         }
+    }
+
+    pub fn args(&self, operands: Vec<String>) -> String {
+        self.args_join(operands, ", ")
+    }
+
+    pub fn runtime(&self, name: &str, operands: Vec<String>) -> String {
+        format!("{}({})", name, self.args(operands))
     }
 }
 

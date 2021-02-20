@@ -9,6 +9,8 @@ https://github.com/curiousdannii/if-decompiler
 
 */
 
+#include "glk.h"
+
 // functions_safe.c
 extern int VM_FUNC_IS_SAFE(glui32 addr);
 
@@ -21,3 +23,7 @@ extern unsigned char *GLULX_IMAGE;
 
 #define TODORAM 0
 #define TODOSTACK 0
+
+// runtime.c
+extern glui32 OP_DIV(glui32 arg1, glui32 arg2);
+extern glui32 OP_MOD(glui32 arg1, glui32 arg2);

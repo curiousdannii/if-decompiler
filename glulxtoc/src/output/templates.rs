@@ -20,6 +20,7 @@ impl GlulxOutput {
             "CMakeLists.txt",
             "exec.c",
             "glulxtoc.h",
+            "runtime.c",
             "unixstrt.c",
         ];
         let replacements = [

@@ -11,6 +11,7 @@ https://github.com/curiousdannii/if-decompiler
 
 use std::env;
 use std::path::PathBuf;
+use std::time::Instant;
 use structopt::StructOpt;
 
 use if_decompiler;
@@ -58,8 +59,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let data = std::fs::read(storyfile_path)?;
 
     // Decompile the storyfile
+    let start = Instant::now();
     let mut decompiler = if_decompiler::glulx::GlulxState::new(data.into_boxed_slice());
     decompiler.decompile_rom();
+    let duration = start.elapsed();
+    println!("Time disassembling the storyfile: {:?}", duration);
 
     // Output the C files
     let output = output::GlulxOutput {

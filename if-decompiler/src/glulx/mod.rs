@@ -12,7 +12,6 @@ https://github.com/curiousdannii/if-decompiler
 use bytes::Buf;
 use std::io::Cursor;
 use fnv::FnvHashMap;
-use fnv::FnvHashSet;
 use petgraph::graph;
 
 use super::*;
@@ -34,23 +33,19 @@ impl GlulxState {
     }
 
     pub fn decompile_rom(&mut self) {
-        let mut graph = self.disassemble();
-
-        // Add the graph edges
-        graph.graph.extend_with_edges(graph.edges.iter().map(|(caller_addr, callee_addr)| {
-            let caller_node = self.functions.get(caller_addr).unwrap().graph_node;
-            let callee_node = self.functions.get(callee_addr).unwrap().graph_node;
-            // The direction must be callee->caller, as we'll change the caller's safety if the callee is unsafe
-            (callee_node, caller_node)
-        }));
+        let graph = self.disassemble();
+        self.walk_function_graph(graph);
     }
 }
 
-// A struct for passing the graph around the functions of the disassembler
-pub struct DisassemblyGraph {
-    pub edges: FnvHashSet<(u32, u32)>,
-    pub graph: graph::Graph<u32, ()>,
-    pub unsafe_functions: Vec<u32>,
+impl VirtualMachine for GlulxState {
+    fn get_function_graph_node(&self, addr: u32) -> graph::NodeIndex {
+        self.functions.get(&addr).unwrap().graph_node
+    }
+
+    fn mark_function_as_unsafe(&mut self, addr: u32) {
+        self.functions.get_mut(&addr).unwrap().safety = FunctionSafety::Unsafe;
+    }
 }
 
 pub struct Function {

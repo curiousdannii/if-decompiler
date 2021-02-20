@@ -13,9 +13,10 @@ https://github.com/curiousdannii/if-decompiler
 #include "glulxe.h"
 #include "glulxtoc.h"
 
-glui32 OP_DIV(glui32 arg1, glui32 arg2) {
-    glsi32 dividend = (glsi32) arg1;
-    glsi32 divisor = (glsi32) arg2;
+glui32 OP_DIV(glui32 arg0, glui32 arg1) {
+    glsi32 dividend = (glsi32) arg0;
+    glsi32 divisor = (glsi32) arg1
+;
     if (divisor == 0) {
         fatal_error("Division by zero.");
     }
@@ -48,9 +49,10 @@ glui32 OP_DIV(glui32 arg1, glui32 arg2) {
     return value;
 }
 
-glui32 OP_MOD(glui32 arg1, glui32 arg2) {
-    glsi32 dividend = (glsi32) arg1;
-    glsi32 divisor = (glsi32) arg2;
+glui32 OP_MOD(glui32 arg0, glui32 arg1) {
+    glsi32 dividend = (glsi32) arg0;
+    glsi32 divisor = (glsi32) arg1
+;
     glui32 value, val0, val1;
     if (divisor == 0) {
         fatal_error("Division by zero doing remainder.");
@@ -70,6 +72,38 @@ glui32 OP_MOD(glui32 arg1, glui32 arg2) {
         value = val0 % val1;
     }
     return value;
+}
+
+glui32 OP_SHIFTL(glui32 arg0, glui32 arg1) {
+    glsi32 vals0 = (glsi32) arg1;
+    if (vals0 < 0 || vals0 >= 32) {
+        return 0;
+    }
+    return (glui32) arg0 << (glui32) vals0;
+}
+
+glui32 OP_USHIFTR(glui32 arg0, glui32 arg1) {
+    glsi32 vals0 = (glsi32) arg1;
+    if (vals0 < 0 || vals0 >= 32) {
+        return 0;
+    }
+    return (glui32) arg0 >> (glui32) vals0;
+}
+
+glui32 OP_SSHIFTR(glui32 arg0, glui32 arg1) {
+    glsi32 vals0 = (glsi32) arg1;
+    if (vals0 < 0 || vals0 >= 32) {
+        if (arg0 & 0x80000000)
+        {
+            return 0xFFFFFFFF;
+        } else {
+            return 0;
+        }
+    }
+    /* This is somewhat foolhardy -- C doesn't guarantee that
+        right-shifting a signed value replicates the sign bit.
+        We'll assume it for now. */
+    return (glsi32) arg0 >> (glsi32) vals0;
 }
 
 glui32 PopStack(void) {

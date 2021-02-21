@@ -47,7 +47,8 @@ impl GlulxOutput {
             let args_list = function_arguments(function.locals);
             let function_spec = format!("glui32 VM_FUNC_{}({})", addr, args_list);
 
-            writeln!(code_file, "{} {{", function_spec)?;
+            writeln!(code_file, "{} {{
+    glui32 temp;", function_spec)?;
             for instruction in &function.instructions {
                 writeln!(code_file, "    {}", self.output_instruction(instruction))?;
             }
@@ -85,7 +86,7 @@ impl GlulxOutput {
     fn output_instruction(&self, instruction: &Instruction) -> String {
         let opcode = instruction.opcode;
         let operands = self.map_operands(instruction);
-        let null = String::from("0");
+        let null = String::from("NULL");
         let op_a = operands.get(0).unwrap_or(&null);
         let op_b = operands.get(1).unwrap_or(&null);
         use opcodes::*;
@@ -104,7 +105,7 @@ impl GlulxOutput {
             OP_SHIFTL => self.runtime("OP_SHIFTL", operands),
             OP_USHIFTR => self.runtime("OP_USHIFTR", operands),
             OP_SSHIFTR => self.runtime("OP_SSHIFTR", operands),
-            OP_JUMP => String::new(), // Handle elsewhere!
+            // OP_JUMP => Handle elsewhere!
             OP_JZ => format!("{} == 0", op_a),
             OP_JNZ => format!("{} != 0", op_a),
             OP_JEQ => format!("{} == {}", op_a, op_b),
@@ -117,13 +118,14 @@ impl GlulxOutput {
             OP_JGTU => format!("{} > {}", op_a, op_b),
             OP_JLEU => format!("{} <= {}", op_a, op_b),
             OP_JGEU => format!("{} >= {}", op_a, op_b),
-
+            //OP_CALL => self.output_call(instruction, pop_x(instruction.operands.get(1).unwrap())),
             OP_RETURN => format!("return {}", op_a),
-            _ => String::from("0"),
+            OP_CALLF ..= OP_CALLFIII => self.output_callf(instruction, operands),
+            _ => null,
         };
         let body_with_storer = self.output_storer(instruction.storer, body);
         // TODO: two storers!
-        format!("/* {}/{} */ {};", instruction.opcode, instruction.addr, body_with_storer)
+        format!("/* {:>3X}/{} */ {};", instruction.opcode, instruction.addr, body_with_storer)
     }
 
     // Map operands into strings
@@ -145,7 +147,7 @@ impl GlulxOutput {
     fn output_storer(&self, storer: Operand, inner: String) -> String {
         use Operand::*;
         match storer {
-            Constant(_) => inner,
+            Constant(_) => inner, // Must still output the inner code in case there are side-effects
             Memory(addr) => format!("MemW4({}, {})", addr, inner),
             Stack => format!("PushStack({})", inner),
             Local(val) => format!("l{} = {}", val / 4, inner),
@@ -170,6 +172,73 @@ impl GlulxOutput {
     pub fn runtime(&self, name: &str, operands: Vec<String>) -> String {
         format!("{}({})", name, self.args(operands))
     }
+
+    // Construct a call
+    fn output_callf(&self, instruction: &Instruction, mut operands: Vec<String>) -> String {
+        use Operand::*;
+        let callee_addr = match instruction.operands[0] {
+            Constant(addr) => addr,
+            _ => panic!(),
+        };
+        // Remove the address
+        operands.remove(0);
+        let mut args = operands;
+        let callee = self.state.functions.get(&callee_addr).unwrap();
+        let provided_args = args.len();
+        let callee_args = callee.locals as usize;
+
+        // Account for extra args
+        if provided_args > callee_args {
+            args.truncate(callee_args);
+            // First check if any of the surplus args are stack pops - we don't need to account for other types
+            let mut surplus_stack_pops = 0;
+            for i in callee_args..provided_args {
+                match instruction.operands[i] {
+                    Stack => {
+                        surplus_stack_pops += 1;
+                    },
+                    _ => {},
+                };
+            }
+            if surplus_stack_pops > 0 {
+                let last_arg = &args[callee_args - 1];
+                args[callee_args - 1] = format!("(temp = {}", last_arg);
+                // Add the extra stack pops
+                for _ in 0..(surplus_stack_pops - 1) {
+                    args.push(String::from("PopStack()"));
+                }
+                args.push(String::from("PopStack(), temp)"))
+            }
+        }
+
+        // Account for not enough args
+        while args.len() < callee_args {
+            args.push(String::from("0"));
+        }
+
+        format!("VM_FUNC_{}({})", callee_addr, args.join(", "))
+    }
+
+    /*fn output_call(&self, instruction: &Instruction, mut args: Vec<String>) -> String {
+        let callee_addr = match instruction.operands[0] {
+            Operand::Constant(addr) => addr,
+            _ => panic!(),
+        };
+        let callee = self.state.functions.get(&callee_addr).unwrap();
+        let provided_args = args.len();
+        let callee_args = callee.locals as usize;
+        // Account for extra args
+        if provided_args > callee_args {
+            let last_arg = &args[callee_args - 1];
+            args[callee_args - 1] = format!("(temp = {}", last_arg);
+            args.last_mut().unwrap().push_str(", temp)");
+        }
+        // Account for not enough args
+        while args.len() < callee_args {
+            args.push(String::from("0"));
+        }
+        format!("VM_FUNC_{}({})", callee_addr, args.join(", "))
+    }*/
 }
 
 fn function_arguments(count: u32) -> String {

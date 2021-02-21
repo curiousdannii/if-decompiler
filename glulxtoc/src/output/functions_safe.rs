@@ -121,27 +121,14 @@ impl GlulxOutput {
             OP_RETURN => format!("return {}", op_a),
             _ => String::from("0"),
         };
-        use glulx::StoreMode::*;
-        let body_with_storer = match instruction_stores(opcode) {
-            DoesNotStore => body,
-            LastOperand => self.output_storer(*instruction.operands.last().unwrap(), body),
-            FirstOperand => self.output_storer(instruction.operands[0], body),
-            // TODO!
-            LastTwoOperands => body,
-        };
+        let body_with_storer = self.output_storer(instruction.storer, body);
+        // TODO: two storers!
         format!("/* {}/{} */ {};", instruction.opcode, instruction.addr, body_with_storer)
     }
 
     // Map operands into strings
     fn map_operands(&self, instruction: &Instruction) -> Vec<String> {
-        use StoreMode::*;
-        match opcodes::instruction_stores(instruction.opcode)
-        {
-            DoesNotStore => &instruction.operands[..],
-            LastOperand => &instruction.operands[..(instruction.operands.len() - 1)],
-            FirstOperand => &instruction.operands[1..],
-            LastTwoOperands => &instruction.operands[..(instruction.operands.len() - 2)],
-        }.iter().map(|&operand| self.output_operand(operand)).collect()
+        instruction.operands.iter().map(|&operand| self.output_operand(operand)).collect()
     }
 
     fn output_operand(&self, operand: Operand) -> String {
@@ -158,7 +145,7 @@ impl GlulxOutput {
     fn output_storer(&self, storer: Operand, inner: String) -> String {
         use Operand::*;
         match storer {
-            Constant(_) => String::new(),
+            Constant(_) => inner,
             Memory(addr) => format!("MemW4({}, {})", addr, inner),
             Stack => format!("PushStack({})", inner),
             Local(val) => format!("l{} = {}", val / 4, inner),

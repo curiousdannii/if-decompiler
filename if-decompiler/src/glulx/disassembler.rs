@@ -330,11 +330,22 @@ impl GlulxState {
             },
         };
 
+        // Extract the storer(s) - in reverse order (makes it simpler for OP_FMOD)
+        use StoreMode::*;
+        let (storer2, storer) = match opcodes::instruction_stores(opcode) {
+            DoesNotStore => (Operand::Constant(0), Operand::Constant(0)),
+            LastOperand => (Operand::Constant(0), operands.pop().unwrap()),
+            FirstOperand => (Operand::Constant(0), operands.remove(0)),
+            LastTwoOperands => (operands.pop().unwrap(), operands.pop().unwrap()),
+        };
+
         Instruction {
             addr,
             opcode,
             operands,
             branch,
+            storer,
+            storer2,
         }
     }
 }

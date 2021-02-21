@@ -121,7 +121,7 @@ impl GlulxOutput {
             OP_RETURN => format!("return {}", op_a),
             _ => String::from("0"),
         };
-        use glulx::Storer::*;
+        use glulx::StoreMode::*;
         let body_with_storer = match instruction_stores(opcode) {
             DoesNotStore => body,
             LastOperand => self.output_storer(*instruction.operands.last().unwrap(), body),
@@ -134,7 +134,7 @@ impl GlulxOutput {
 
     // Map operands into strings
     fn map_operands(&self, instruction: &Instruction) -> Vec<String> {
-        use Storer::*;
+        use StoreMode::*;
         match opcodes::instruction_stores(instruction.opcode)
         {
             DoesNotStore => &instruction.operands[..],

@@ -35,7 +35,7 @@ pub trait VirtualMachine {
     fn get_function_graph_node(&self, addr: u32) -> graph::NodeIndex;
     fn mark_function_as_unsafe(&mut self, addr: u32);
 
-    fn walk_function_graph(&mut self, mut graph: DisassemblyGraph) {
+    fn mark_all_unsafe_functions(&mut self, mut graph: DisassemblyGraph) {
         // First add the graph edges
         graph.graph.extend_with_edges(graph.edges.iter().map(|(caller_addr, callee_addr)| {
             let caller_node = self.get_function_graph_node(*caller_addr);

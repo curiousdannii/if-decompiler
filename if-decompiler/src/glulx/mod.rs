@@ -34,7 +34,7 @@ impl GlulxState {
 
     pub fn decompile_rom(&mut self) {
         let graph = self.disassemble();
-        self.walk_function_graph(graph);
+        self.mark_all_unsafe_functions(graph);
     }
 
     pub fn read_addr(&self, addr: u32) -> u32 {
@@ -114,7 +114,7 @@ pub enum Operand {
 }
 
 #[derive(Copy, Clone, PartialEq)]
-pub enum Storer {
+pub enum StoreMode {
     DoesNotStore,
     LastOperand,
     FirstOperand,

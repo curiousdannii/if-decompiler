@@ -183,8 +183,8 @@ pub fn instruction_halts(opcode: u32) -> bool {
 }
 
 // Whether an instruction stores
-pub fn instruction_stores(opcode: u32) -> Storer {
-    use Storer::*;
+pub fn instruction_stores(opcode: u32) -> StoreMode {
+    use StoreMode::*;
     match opcode {
         OP_ADD ..= OP_USHIFTR | OP_CALL | OP_COPY ..= OP_STKPEEK | OP_GETSTALT
             | OP_GETMEMSIZE | OP_SETMEMSIZE | OP_RANDOM | OP_VERIFY

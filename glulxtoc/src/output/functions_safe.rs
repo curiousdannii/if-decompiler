@@ -131,7 +131,7 @@ impl GlulxOutput {
             OP_CALLF ..= OP_CALLFIII => self.output_callf(instruction, operands),
             _ => self.output_common_instruction(instruction, operands),
         };
-        let body_with_storer = self.output_storer(instruction.storer, body);
+        let body_with_storer = self.output_storer(opcode, instruction.storer, body);
         // TODO: two storers!
         format!("/* {:>3X}/{} */ {};", instruction.opcode, instruction.addr, body_with_storer)
     }
@@ -152,33 +152,20 @@ impl GlulxOutput {
         }
     }
 
-    fn output_storer(&self, storer: Operand, inner: String) -> String {
+    fn output_storer(&self, opcode: u32, storer: Operand, inner: String) -> String {
         use Operand::*;
+        let func = match opcode {
+            opcodes::OP_COPYS => "MemW2",
+            opcodes::OP_COPYB => "MemW1",
+            _ => "MemW4",
+        };
         match storer {
             Constant(_) => inner, // Must still output the inner code in case there are side-effects
-            Memory(addr) => format!("MemW4({}, {})", addr, inner),
+            Memory(addr) => format!("{}({}, {})", func, addr, inner),
             Stack => format!("PushStack({})", inner),
             Local(val) => format!("l{} = {}", val / 4, inner),
-            RAM(addr) => format!("MemW4({}, {})", addr + self.ramstart, inner),
+            RAM(addr) => format!("{}({}, {})", func, addr + self.ramstart, inner),
         }
-    }
-
-    // And some functions which can be used by functions_unsafe.rs too
-    pub fn args_join(&self, operands: Vec<String>, joiner: &str) -> String {
-        match operands.len() {
-            0 => String::new(),
-            1 => format!("{}", operands[0]),
-            2 => format!("{}{}{}", operands[0], joiner, operands[1]),
-            _ => operands.join(joiner),
-        }
-    }
-
-    pub fn args(&self, operands: Vec<String>) -> String {
-        self.args_join(operands, ", ")
-    }
-
-    pub fn runtime(&self, name: &str, operands: Vec<String>) -> String {
-        format!("{}({})", name, self.args(operands))
     }
 
     // Construct a call

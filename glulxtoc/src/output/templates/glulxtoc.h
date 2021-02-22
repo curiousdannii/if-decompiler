@@ -28,6 +28,8 @@ extern glui32 OP_MOD(glui32 arg1, glui32 arg2);
 extern glui32 OP_SHIFTL(glui32 arg1, glui32 arg2);
 extern glui32 OP_USHIFTR(glui32 arg1, glui32 arg2);
 extern glui32 OP_SSHIFTR(glui32 arg0, glui32 arg1);
+extern glui32 OP_SEXS(glui32 arg0);
+extern glui32 OP_SEXB(glui32 arg0);
 extern glui32 OP_ALOADBIT(glui32 arg0, glui32 arg1);
 extern void OP_ASTOREBIT(glui32 arg0, glui32 arg1, glui32 arg2);
 extern glui32 PopStack(void);

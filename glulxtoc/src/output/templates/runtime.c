@@ -4,6 +4,7 @@ Runtime functions - mostly things that used to be in exec.c
 ===========================================================
 
 Copyright (c) 2021 Dannii Willis
+Copyright (c) 1999-2016, Andrew Plotkin
 MIT licenced
 https://github.com/curiousdannii/if-decompiler
 
@@ -104,6 +105,22 @@ glui32 OP_SSHIFTR(glui32 arg0, glui32 arg1) {
         right-shifting a signed value replicates the sign bit.
         We'll assume it for now. */
     return (glsi32) arg0 >> (glsi32) vals0;
+}
+
+glui32 OP_SEXS(glui32 arg0) {
+    if (arg0 & 0x8000)
+    {
+        return arg0 |= 0xFFFF0000;
+    }
+    return arg0 &= 0x0000FFFF;
+}
+
+glui32 OP_SEXB(glui32 arg0) {
+    if (arg0 & 0x80)
+    {
+        return arg0 |= 0xFFFFFF00;
+    }
+    return arg0 &= 0x000000FF;
 }
 
 glui32 OP_ALOADBIT(glui32 arg0, glui32 arg1) {

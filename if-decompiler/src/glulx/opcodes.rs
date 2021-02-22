@@ -9,8 +9,6 @@ https://github.com/curiousdannii/if-decompiler
 
 */
 
-#![allow(dead_code)]
-
 use super::*;
 
 pub const OP_NOP: u32 = 0x00;
@@ -203,7 +201,7 @@ pub fn function_safety(instructions: &Vec<Instruction>) -> FunctionSafety {
     use FunctionSafety::*;
     for instruction in instructions {
         match instruction.opcode {
-            OP_CATCH | OP_THROW | OP_RESTORE | OP_RESTOREUNDO | OP_GLK => continue,
+            OP_CATCH | OP_THROW | OP_RESTORE | OP_RESTOREUNDO => continue,
             OP_QUIT | OP_RESTART => return Unsafe,
 
             // Calls to non-constants are unsafe

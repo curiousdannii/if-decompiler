@@ -53,6 +53,9 @@ impl GlulxOutput {
             OP_JLEU => format!("{} <= {}", op_a, op_b),
             OP_JGEU => format!("{} >= {}", op_a, op_b),
             OP_RETURN => format!("return {}", op_a),
+            OP_COPY | OP_COPYS | OP_COPYB => op_a.clone(),
+            OP_SEXS => self.runtime("OP_SEXS", args),
+            OP_SEXB => self.runtime("OP_SEXB", args),
             OP_ALOAD => format!("Mem4({} + 4 * {})", op_a, op_b),
             OP_ALOADS => format!("Mem2({} + 2 * {})", op_a, op_b),
             OP_ALOADB => format!("Mem1({} + {})", op_a, op_b),
@@ -63,6 +66,23 @@ impl GlulxOutput {
             OP_ASTOREBIT => self.runtime("OP_ASTOREBIT", args),
             _ => null, // TODO panic here
         }
+    }
+
+    pub fn args_join(&self, operands: Vec<String>, joiner: &str) -> String {
+        match operands.len() {
+            0 => String::new(),
+            1 => format!("{}", operands[0]),
+            2 => format!("{}{}{}", operands[0], joiner, operands[1]),
+            _ => operands.join(joiner),
+        }
+    }
+
+    pub fn args(&self, operands: Vec<String>) -> String {
+        self.args_join(operands, ", ")
+    }
+
+    pub fn runtime(&self, name: &str, operands: Vec<String>) -> String {
+        format!("{}({})", name, self.args(operands))
     }
 
 }

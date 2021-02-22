@@ -11,6 +11,7 @@ https://github.com/curiousdannii/if-decompiler
 
 use std::io::prelude::*;
 use std::time::Instant;
+use fnv::FnvHashMap;
 
 use if_decompiler::*;
 use glulx::*;
@@ -37,14 +38,26 @@ impl GlulxOutput {
 ")?;
 
         // Output the function bodies
-        let mut safe_funcs = Vec::default();
+        let mut safe_funcs: FnvHashMap<u32, Vec<u32>> = FnvHashMap::default();
+        let mut highest_arg_count = 0;
         for (addr, function) in &self.state.functions {
             if function.safety == FunctionSafety::Unsafe {
                 continue;
             }
 
-            safe_funcs.push(addr);
-            let args_list = function_arguments(function.locals);
+            // Add to the list of safe_funcs
+            match safe_funcs.get_mut(&function.locals) {
+                Some(vec) => {
+                    vec.push(*addr);
+                },
+                None => {
+                    if function.locals > highest_arg_count {
+                        highest_arg_count = function.locals;
+                    }
+                    safe_funcs.insert(function.locals, vec![*addr]);
+                },
+            };
+            let args_list = function_arguments(function.locals, true, ",");
             let function_spec = format!("glui32 VM_FUNC_{}({})", addr, args_list);
 
             writeln!(code_file, "{} {{
@@ -59,22 +72,42 @@ impl GlulxOutput {
             writeln!(header_file, "extern glui32 VM_FUNC_{}({});", addr, args_list)?;
         }
 
-        // Output the VM_FUNC_IS_SAFE function
-        writeln!(code_file, "int VM_FUNC_IS_SAFE(glui32 addr) {{
+        // Output the VM_FUNC_ARGUMENTS_COUNT function
+        writeln!(code_file, "int VM_FUNC_ARGUMENTS_COUNT(glui32 addr) {{
     switch (addr) {{")?;
-        for row in safe_funcs[..].chunks(5) {
-            write!(code_file, "        ")?;
-            let mut row_str = String::new();
-            for addr in row {
-                row_str.push_str(&format!("case {}: ", addr));
+        for (count, funcs) in &safe_funcs {
+            for row in funcs[..].chunks(5) {
+                write!(code_file, "        ")?;
+                let mut row_str = String::new();
+                for addr in row {
+                    row_str.push_str(&format!("case {}: ", addr));
+                }
+                row_str.truncate(row_str.len() - 1);
+                writeln!(code_file, "{}", row_str)?;
             }
-            row_str.truncate(row_str.len() - 1);
-            writeln!(code_file, "{}", row_str)?;
+            writeln!(code_file, "            return {};", count)?;
         }
-        write!(code_file, "            return 1;
-        default:
-            return 0;
+        writeln!(code_file, "        default:
+            return -1;
     }}
+}}
+")?;
+
+        // Output the VM_DYNAMIC_FUNCTION_CALL function
+        writeln!(code_file, "glui32 VM_DYNAMIC_FUNCTION_CALL(glui32 addr, glui32 count) {{
+    {};
+    switch (count) {{", function_arguments(highest_arg_count, true, ";"))?;
+        for i in (0..highest_arg_count).rev() {
+            writeln!(code_file, "        case {}: l{} = PopStack();", i + 1, i)?;
+        }
+        writeln!(code_file, "    }}
+    switch (addr) {{")?;
+        for (count, funcs) in &safe_funcs {
+            for addr in funcs {
+                writeln!(code_file, "        case {}: return VM_FUNC_{}({});", addr, addr, function_arguments(*count, false, ","))?;
+            }
+        }
+        write!(code_file, "    }}
 }}")?;
 
         let duration = start.elapsed();
@@ -118,8 +151,9 @@ impl GlulxOutput {
             OP_JGTU => format!("{} > {}", op_a, op_b),
             OP_JLEU => format!("{} <= {}", op_a, op_b),
             OP_JGEU => format!("{} >= {}", op_a, op_b),
-            //OP_CALL => self.output_call(instruction, pop_x(instruction.operands.get(1).unwrap())),
+            OP_CALL => self.output_call_on_stack(instruction, op_a, op_b),
             OP_RETURN => format!("return {}", op_a),
+            OP_TAILCALL => format!("return {}", self.output_call_on_stack(instruction, op_a, op_b)),
             OP_CALLF ..= OP_CALLFIII => self.output_callf(instruction, operands),
             _ => null,
         };
@@ -174,15 +208,12 @@ impl GlulxOutput {
     }
 
     // Construct a call
-    fn output_callf(&self, instruction: &Instruction, mut operands: Vec<String>) -> String {
+    fn output_call(&self, instruction: &Instruction, mut args: Vec<String>, is_callf: bool) -> String {
         use Operand::*;
         let callee_addr = match instruction.operands[0] {
             Constant(addr) => addr,
-            _ => panic!(),
+            _ => panic!("Dynamic callf not supported"),
         };
-        // Remove the address
-        operands.remove(0);
-        let mut args = operands;
         let callee = self.state.functions.get(&callee_addr).unwrap();
         let provided_args = args.len();
         let callee_args = callee.locals as usize;
@@ -192,13 +223,18 @@ impl GlulxOutput {
             args.truncate(callee_args);
             // First check if any of the surplus args are stack pops - we don't need to account for other types
             let mut surplus_stack_pops = 0;
-            for i in callee_args..provided_args {
-                match instruction.operands[i] {
-                    Stack => {
-                        surplus_stack_pops += 1;
-                    },
-                    _ => {},
-                };
+            if is_callf {
+                for i in callee_args..provided_args {
+                    // Add 1 because we removed the callee address
+                    match instruction.operands[i + 1] {
+                        Stack => {
+                            surplus_stack_pops += 1;
+                        },
+                        _ => {},
+                    };
+                }
+            } else {
+                surplus_stack_pops = provided_args - callee_args;
             }
             if surplus_stack_pops > 0 {
                 let last_arg = &args[callee_args - 1];
@@ -219,35 +255,36 @@ impl GlulxOutput {
         format!("VM_FUNC_{}({})", callee_addr, args.join(", "))
     }
 
-    /*fn output_call(&self, instruction: &Instruction, mut args: Vec<String>) -> String {
-        let callee_addr = match instruction.operands[0] {
-            Operand::Constant(addr) => addr,
-            _ => panic!(),
-        };
-        let callee = self.state.functions.get(&callee_addr).unwrap();
-        let provided_args = args.len();
-        let callee_args = callee.locals as usize;
-        // Account for extra args
-        if provided_args > callee_args {
-            let last_arg = &args[callee_args - 1];
-            args[callee_args - 1] = format!("(temp = {}", last_arg);
-            args.last_mut().unwrap().push_str(", temp)");
+    fn output_callf(&self, instruction: &Instruction, mut operands: Vec<String>) -> String {
+        // Remove the address
+        operands.remove(0);
+        self.output_call(instruction, operands, true)
+    }
+
+    fn output_call_on_stack(&self, instruction: &Instruction, addr: &String, count: &String) -> String {
+        use Operand::*;
+        match instruction.operands[1] {
+            Constant(count) => {
+                let mut args = Vec::new();
+                for _ in 0..count {
+                    args.push(String::from("PopStack()"));
+                }
+                self.output_call(instruction, args, false)
+            },
+            _ => {
+                format!("VM_DYNAMIC_FUNCTION_CALL({}, {})", addr, count)
+            },
         }
-        // Account for not enough args
-        while args.len() < callee_args {
-            args.push(String::from("0"));
-        }
-        format!("VM_FUNC_{}({})", callee_addr, args.join(", "))
-    }*/
+    }
 }
 
-fn function_arguments(count: u32) -> String {
+fn function_arguments(count: u32, include_types: bool, separator: &str) -> String {
     let mut output = String::new();
     if count == 0 {
-        return String::from("void");
+        return String::from(if include_types {"void"} else {""});
     }
     for arg in 0..count {
-        output.push_str(&format!("glui32 l{}, ", arg));
+        output.push_str(&format!("{}l{}{} ", if include_types {"glui32 "} else {""}, arg, separator));
     }
     output.truncate(output.len() - 2);
 

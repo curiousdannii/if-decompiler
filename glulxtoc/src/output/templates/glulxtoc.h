@@ -12,7 +12,8 @@ https://github.com/curiousdannii/if-decompiler
 #include "glk.h"
 
 // functions_safe.c
-extern int VM_FUNC_IS_SAFE(glui32 addr);
+extern glui32 VM_DYNAMIC_FUNCTION_CALL(glui32 addr, glui32 count);
+extern int VM_FUNC_ARGUMENTS_COUNT(glui32 addr);
 
 // functions_unsafe.c
 extern void VM_UNSAFE_FUNCS(void);

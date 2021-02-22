@@ -106,6 +106,39 @@ glui32 OP_SSHIFTR(glui32 arg0, glui32 arg1) {
     return (glsi32) arg0 >> (glsi32) vals0;
 }
 
+glui32 OP_ALOADBIT(glui32 arg0, glui32 arg1) {
+    glsi32 vals0 = (glsi32) arg1;
+    glui32 val1 = (vals0 & 7);
+    if (vals0 >= 0) {
+        arg0 += (vals0 >> 3);
+    } else {
+        arg0 -= (1 + ((-1 - vals0) >> 3));
+    }
+    if (Mem1(arg0) & (1 << val1))
+    {
+        return 1;
+    } else { 
+        return 0;
+    }
+}
+
+void OP_ASTOREBIT(glui32 arg0, glui32 arg1, glui32 arg2) {
+    glsi32 vals0 = (glsi32) arg1;
+    glui32 val1 = (vals0 & 7);
+    if (vals0 >= 0) {
+        arg0 += (vals0 >> 3);
+    } else {
+        arg0 -= (1 + ((-1 - vals0) >> 3));
+    }
+    glui32 val0 = Mem1(arg0);
+    if (arg2) {
+        val0 |= (1 << val1);
+    } else {
+        val0 &= ~((glui32)(1 << val1));
+    }
+    MemW1(arg0, val0);
+}
+
 glui32 PopStack(void) {
     if (stackptr < valstackbase+4) {
         fatal_error("Stack underflow in operand.");

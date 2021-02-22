@@ -186,8 +186,9 @@ pub fn instruction_halts(opcode: u32) -> bool {
 pub fn instruction_stores(opcode: u32) -> StoreMode {
     use StoreMode::*;
     match opcode {
-        OP_ADD ..= OP_USHIFTR | OP_CALL | OP_COPY ..= OP_STKPEEK | OP_GETSTALT
-            | OP_GETMEMSIZE | OP_SETMEMSIZE | OP_RANDOM | OP_VERIFY
+        OP_ADD ..= OP_USHIFTR | OP_CALL | OP_COPY ..= OP_ALOADBIT
+            | OP_STKCOUNT ..= OP_STKPEEK | OP_GETSTALT | OP_GETMEMSIZE
+            | OP_SETMEMSIZE | OP_RANDOM | OP_VERIFY
             | OP_SAVE ..= OP_RESTOREUNDO | OP_GLK | OP_GETSTRINGTBL
             | OP_LINEARSEARCH ..= OP_CALLFIII | OP_MALLOC | OP_NUMTOF ..= OP_FDIV
             | OP_SQRT ..= OP_ATAN2 => LastOperand,

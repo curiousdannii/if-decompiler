@@ -65,7 +65,8 @@ impl GlulxOutput {
             for instruction in &function.instructions {
                 writeln!(code_file, "    {}", self.output_instruction(instruction))?;
             }
-            writeln!(code_file, "}}
+            writeln!(code_file, "return 0;
+}}
 ")?;
 
             // And the header declaration
@@ -108,6 +109,7 @@ impl GlulxOutput {
             }
         }
         write!(code_file, "    }}
+    fatal_error_i(\"VM_DYNAMIC_FUNCTION_CALL called with non-safe function address:\", addr);
 }}")?;
 
         let duration = start.elapsed();
@@ -124,38 +126,10 @@ impl GlulxOutput {
         let op_b = operands.get(1).unwrap_or(&null);
         use opcodes::*;
         let body = match opcode {
-            OP_NOP => String::new(),
-            OP_ADD => self.args_join(operands, " + "),
-            OP_SUB => self.args_join(operands, " - "),
-            OP_MUL => self.args_join(operands, " * "),
-            OP_DIV => self.runtime("OP_DIV", operands),
-            OP_MOD => self.runtime("OP_MOD", operands),
-            OP_NEG => format!("-((glsi32) {})", op_a),
-            OP_BITAND => self.args_join(operands, " & "),
-            OP_BITOR => self.args_join(operands, " | "),
-            OP_BITXOR => self.args_join(operands, " ^ "),
-            OP_BITNOT => format!("~{}", op_a),
-            OP_SHIFTL => self.runtime("OP_SHIFTL", operands),
-            OP_USHIFTR => self.runtime("OP_USHIFTR", operands),
-            OP_SSHIFTR => self.runtime("OP_SSHIFTR", operands),
-            // OP_JUMP => Handle elsewhere!
-            OP_JZ => format!("{} == 0", op_a),
-            OP_JNZ => format!("{} != 0", op_a),
-            OP_JEQ => format!("{} == {}", op_a, op_b),
-            OP_JNE => format!("{} != {}", op_a, op_b),
-            OP_JLT => format!("(glsi32) {} < (glsi32) {}", op_a, op_b),
-            OP_JGT => format!("(glsi32) {} > (glsi32) {}", op_a, op_b),
-            OP_JLE => format!("(glsi32) {} <= (glsi32) {}", op_a, op_b),
-            OP_JGE => format!("(glsi32) {} >= (glsi32) {}", op_a, op_b),
-            OP_JLTU => format!("{} < {}", op_a, op_b),
-            OP_JGTU => format!("{} > {}", op_a, op_b),
-            OP_JLEU => format!("{} <= {}", op_a, op_b),
-            OP_JGEU => format!("{} >= {}", op_a, op_b),
             OP_CALL => self.output_call_on_stack(instruction, op_a, op_b),
-            OP_RETURN => format!("return {}", op_a),
             OP_TAILCALL => format!("return {}", self.output_call_on_stack(instruction, op_a, op_b)),
             OP_CALLF ..= OP_CALLFIII => self.output_callf(instruction, operands),
-            _ => null,
+            _ => self.output_common_instruction(instruction, operands),
         };
         let body_with_storer = self.output_storer(instruction.storer, body);
         // TODO: two storers!

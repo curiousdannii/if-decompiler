@@ -15,6 +15,7 @@ use std::path::PathBuf;
 
 use if_decompiler::glulx::GlulxState;
 
+mod functions_common;
 mod functions_safe;
 mod functions_unsafe;
 mod image;

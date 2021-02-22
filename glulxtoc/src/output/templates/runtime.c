@@ -16,8 +16,7 @@ https://github.com/curiousdannii/if-decompiler
 
 glui32 OP_DIV(glui32 arg0, glui32 arg1) {
     glsi32 dividend = (glsi32) arg0;
-    glsi32 divisor = (glsi32) arg1
-;
+    glsi32 divisor = (glsi32) arg1;
     if (divisor == 0) {
         fatal_error("Division by zero.");
     }
@@ -52,8 +51,7 @@ glui32 OP_DIV(glui32 arg0, glui32 arg1) {
 
 glui32 OP_MOD(glui32 arg0, glui32 arg1) {
     glsi32 dividend = (glsi32) arg0;
-    glsi32 divisor = (glsi32) arg1
-;
+    glsi32 divisor = (glsi32) arg1;
     glui32 value, val0, val1;
     if (divisor == 0) {
         fatal_error("Division by zero doing remainder.");

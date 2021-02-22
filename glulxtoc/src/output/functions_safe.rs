@@ -65,7 +65,7 @@ impl GlulxOutput {
             for instruction in &function.instructions {
                 writeln!(code_file, "    {}", self.output_instruction(instruction))?;
             }
-            writeln!(code_file, "return 0;
+            writeln!(code_file, "    return 0;
 }}
 ")?;
 
@@ -94,22 +94,20 @@ impl GlulxOutput {
 }}
 ")?;
 
-        // Output the VM_DYNAMIC_FUNCTION_CALL function
-        writeln!(code_file, "glui32 VM_DYNAMIC_FUNCTION_CALL(glui32 addr, glui32 count) {{
-    {};
-    switch (count) {{", function_arguments(highest_arg_count, true, ";"))?;
-        for i in (0..highest_arg_count).rev() {
-            writeln!(code_file, "        case {}: l{} = PopStack();", i + 1, i)?;
+        // Output the VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS function
+        writeln!(code_file, "glui32 VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(glui32 addr, glui32 count) {{
+    {};", function_arguments(highest_arg_count, true, ";"))?;
+        for i in 0..highest_arg_count {
+            writeln!(code_file, "    if (count > {}) {{ l{} = PopStack(); }}", i, i)?;
         }
-        writeln!(code_file, "    }}
-    switch (addr) {{")?;
+        writeln!(code_file, "    switch (addr) {{")?;
         for (count, funcs) in &safe_funcs {
             for addr in funcs {
                 writeln!(code_file, "        case {}: return VM_FUNC_{}({});", addr, addr, function_arguments(*count, false, ","))?;
             }
         }
-        write!(code_file, "    }}
-    fatal_error_i(\"VM_DYNAMIC_FUNCTION_CALL called with non-safe function address:\", addr);
+        write!(code_file, "        default: fatal_error_i(\"VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS called with non-safe function address:\", addr);
+    }}
 }}")?;
 
         let duration = start.elapsed();
@@ -233,7 +231,7 @@ impl GlulxOutput {
                 self.output_call(instruction, args, false)
             },
             _ => {
-                format!("VM_DYNAMIC_FUNCTION_CALL({}, {})", addr, count)
+                format!("VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS({}, {})", addr, count)
             },
         }
     }

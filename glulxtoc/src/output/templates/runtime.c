@@ -154,8 +154,88 @@ void OP_ASTOREBIT(glui32 arg0, glui32 arg1, glui32 arg2) {
     MemW1(arg0, val0);
 }
 
+glui32 OP_STKPEEK(glui32 arg0) {
+    arg0 = arg0 * 4;
+    if (arg0 < 0 || arg0 >= (stackptr - valstackbase))
+    {
+        fatal_error("Stkpeek outside current stack range.");
+    }
+    return Stk4(stackptr - (arg0 + 4));
+}
+
+void OP_STKSWAP(void) {
+    if (stackptr < valstackbase + 8) {
+        fatal_error("Stack underflow in stkswap.");
+    }
+    glui32 val0 = Stk4(stackptr - 4);
+    glui32 val1 = Stk4(stackptr - 8);
+    StkW4(stackptr - 4, val1);
+    StkW4(stackptr - 8, val0);
+}
+
+void OP_STKCOPY(glui32 arg0) {
+    glsi32 vals0 = (glsi32) arg0;
+    if (vals0 < 0) {
+        fatal_error("Negative operand in stkcopy.");
+    }
+    if (vals0 == 0) {
+        return;
+    }
+    if (stackptr < valstackbase + vals0 * 4) {
+        fatal_error("Stack underflow in stkcopy.");
+    }
+    if (stackptr + vals0 * 4 > stacksize) {
+        fatal_error("Stack overflow in stkcopy.");
+    }
+    glui32 addr = stackptr - vals0 * 4;
+    for (glui32 ix = 0; ix < vals0; ix++) {
+        glui32 value = Stk4(addr + ix * 4);
+        StkW4(stackptr + ix * 4, value);
+    }
+    stackptr += vals0 * 4;
+}
+
+void OP_STKROLL(glui32 arg0, glui32 arg1) {
+    glsi32 vals0 = (glsi32) arg0;
+    glsi32 vals1 = (glsi32) arg1;
+    if (vals0 < 0) {
+        fatal_error("Negative operand in stkroll.");
+    }
+    if (stackptr < valstackbase + vals0 * 4) {
+        fatal_error("Stack underflow in stkroll.");
+    }
+    if (vals0 == 0) {
+        return;
+    }
+    /* The following is a bit ugly. We want to do vals1 = vals0-vals1,
+        because rolling down is sort of easier than rolling up. But
+        we also want to take the result mod vals0. The % operator is
+        annoying for negative numbers, so we need to do this in two 
+        cases. */
+    if (vals1 > 0) {
+        vals1 = vals1 % vals0;
+        vals1 = (vals0) - vals1;
+    }
+    else {
+        vals1 = (-vals1) % vals0;
+    }
+    if (vals1 == 0)
+    {
+        return;
+    }
+    glui32 addr = stackptr - vals0 * 4;
+    for (glui32 ix = 0; ix < vals1; ix++) {
+        glui32 value = Stk4(addr + ix * 4);
+        StkW4(stackptr + ix * 4, value);
+    }
+    for (glui32 ix=0; ix < vals0; ix++) {
+        glui32 value = Stk4(addr + (vals1 + ix) * 4);
+        StkW4(addr + ix * 4, value);
+    }
+}
+
 glui32 PopStack(void) {
-    if (stackptr < valstackbase+4) {
+    if (stackptr < valstackbase + 4) {
         fatal_error("Stack underflow in operand.");
     }
     stackptr -= 4;
@@ -163,7 +243,7 @@ glui32 PopStack(void) {
 }
 
 void PushStack(glui32 storeval) {
-    if (stackptr+4 > stacksize) {
+    if (stackptr + 4 > stacksize) {
         fatal_error("Stack overflow in store operand.");
     }
     StkW4(stackptr, storeval);

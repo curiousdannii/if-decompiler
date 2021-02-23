@@ -64,6 +64,11 @@ impl GlulxOutput {
             OP_ASTORES => format!("MemW2({} + 2 * {}, {})", op_a, op_b, args[2]),
             OP_ASTOREB => format!("MemW1({} + {}, {})", op_a, op_b, args[2]),
             OP_ASTOREBIT => self.runtime("OP_ASTOREBIT", args),
+            OP_STKCOUNT => String::from("(stackptr - valstackbase) / 4"),
+            OP_STKPEEK => self.runtime("OP_STKPEEK", args),
+            OP_STKSWAP => self.runtime("OP_STKSWAP", args),
+            OP_STKCOPY => self.runtime("OP_STKCOPY", args),
+            OP_STKROLL => self.runtime("OP_STKROLL", args),
             _ => null, // TODO panic here
         }
     }

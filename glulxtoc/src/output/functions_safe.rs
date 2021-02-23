@@ -32,6 +32,8 @@ impl GlulxOutput {
 #include \"glulxe.h\"
 #include \"glulxtoc.h\"
 
+#define CALL_FUNC(code) (oldsp = stackptr, oldvsb = valstackbase, res = code, stackptr = oldsp, valstackbase = oldvsb, res)
+
 ")?;
         write!(header_file, "#include \"glk.h\"
 
@@ -61,7 +63,8 @@ impl GlulxOutput {
             let function_spec = format!("glui32 VM_FUNC_{}({})", addr, args_list);
 
             writeln!(code_file, "{} {{
-    glui32 temp;", function_spec)?;
+    glui32 arg, oldsp, oldvsb, res;
+    valstackbase = stackptr;", function_spec)?;
             for instruction in &function.instructions {
                 writeln!(code_file, "    {}", self.output_instruction(instruction))?;
             }
@@ -197,12 +200,7 @@ impl GlulxOutput {
             }
             if surplus_stack_pops > 0 {
                 let last_arg = &args[callee_args - 1];
-                args[callee_args - 1] = format!("(temp = {}", last_arg);
-                // Add the extra stack pops
-                for _ in 0..(surplus_stack_pops - 1) {
-                    args.push(String::from("PopStack()"));
-                }
-                args.push(String::from("PopStack(), temp)"))
+                args[callee_args - 1] = format!("(arg = {}, stackptr -= {}, arg)", last_arg, surplus_stack_pops * 4);
             }
         }
 
@@ -211,7 +209,7 @@ impl GlulxOutput {
             args.push(String::from("0"));
         }
 
-        format!("VM_FUNC_{}({})", callee_addr, args.join(", "))
+        format!("CALL_FUNC(VM_FUNC_{}({}))", callee_addr, args.join(", "))
     }
 
     fn output_callf(&self, instruction: &Instruction, mut operands: Vec<String>) -> String {
@@ -231,7 +229,7 @@ impl GlulxOutput {
                 self.output_call(instruction, args, false)
             },
             _ => {
-                format!("VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS({}, {})", addr, count)
+                format!("CALL_FUNC(VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS({}, {}))", addr, count)
             },
         }
     }

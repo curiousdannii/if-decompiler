@@ -18,7 +18,6 @@ impl GlulxOutput {
 
         let templates = [
             "CMakeLists.txt",
-            "exec.c",
             "glulxtoc.h",
             "runtime.c",
             "unixstrt.c",

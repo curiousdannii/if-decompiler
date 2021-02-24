@@ -66,7 +66,7 @@ impl GlulxOutput {
     glui32 arg, oldsp, oldvsb, res;
     valstackbase = stackptr;", function_spec)?;
             for instruction in &function.instructions {
-                writeln!(code_file, "    {}", self.output_instruction(instruction))?;
+                writeln!(code_file, "    /* {:>3X}/{} */ {};", instruction.opcode, instruction.addr, self.output_instruction_safe(instruction))?;
             }
             writeln!(code_file, "    return 0;
 }}
@@ -119,30 +119,29 @@ impl GlulxOutput {
     }
 
     // Output an instruction
-    fn output_instruction(&self, instruction: &Instruction) -> String {
+    fn output_instruction_safe(&self, instruction: &Instruction) -> String {
         let opcode = instruction.opcode;
-        let operands = self.map_operands(instruction);
+        let operands = self.map_operands_safe(instruction);
         let null = String::from("NULL");
         let op_a = operands.get(0).unwrap_or(&null);
         let op_b = operands.get(1).unwrap_or(&null);
         use opcodes::*;
         let body = match opcode {
-            OP_CALL => self.output_call_on_stack(instruction, op_a, op_b),
-            OP_TAILCALL => format!("return {}", self.output_call_on_stack(instruction, op_a, op_b)),
-            OP_CALLF ..= OP_CALLFIII => self.output_callf(instruction, operands),
+            OP_CALL => self.output_call_on_stack_safe(instruction, op_a, op_b),
+            OP_RETURN => format!("return {}", op_a),
+            OP_TAILCALL => format!("return {}", self.output_call_on_stack_safe(instruction, op_a, op_b)),
+            OP_CALLF ..= OP_CALLFIII => self.output_callf_safe(instruction, operands),
             _ => self.output_common_instruction(instruction, operands),
         };
-        let body_with_storer = self.output_storer(opcode, instruction.storer, body);
-        // TODO: two storers!
-        format!("/* {:>3X}/{} */ {};", instruction.opcode, instruction.addr, body_with_storer)
+        self.output_storer_safe(opcode, instruction.storer, body)
     }
 
     // Map operands into strings
-    fn map_operands(&self, instruction: &Instruction) -> Vec<String> {
-        instruction.operands.iter().map(|&operand| self.output_operand(operand)).collect()
+    fn map_operands_safe(&self, instruction: &Instruction) -> Vec<String> {
+        instruction.operands.iter().map(|&operand| self.output_operand_safe(operand)).collect()
     }
 
-    fn output_operand(&self, operand: Operand) -> String {
+    fn output_operand_safe(&self, operand: Operand) -> String {
         use Operand::*;
         match operand {
             Constant(val) => val.to_string(),
@@ -153,7 +152,7 @@ impl GlulxOutput {
         }
     }
 
-    fn output_storer(&self, opcode: u32, storer: Operand, inner: String) -> String {
+    fn output_storer_safe(&self, opcode: u32, storer: Operand, inner: String) -> String {
         use Operand::*;
         let func = match opcode {
             opcodes::OP_COPYS => "MemW2",
@@ -170,7 +169,7 @@ impl GlulxOutput {
     }
 
     // Construct a call
-    fn output_call(&self, instruction: &Instruction, mut args: Vec<String>, is_callf: bool) -> String {
+    fn output_call_safe(&self, instruction: &Instruction, mut args: Vec<String>, is_callf: bool) -> String {
         use Operand::*;
         let callee_addr = match instruction.operands[0] {
             Constant(addr) => addr,
@@ -212,13 +211,13 @@ impl GlulxOutput {
         format!("CALL_FUNC(VM_FUNC_{}({}))", callee_addr, args.join(", "))
     }
 
-    fn output_callf(&self, instruction: &Instruction, mut operands: Vec<String>) -> String {
+    fn output_callf_safe(&self, instruction: &Instruction, mut operands: Vec<String>) -> String {
         // Remove the address
         operands.remove(0);
-        self.output_call(instruction, operands, true)
+        self.output_call_safe(instruction, operands, true)
     }
 
-    fn output_call_on_stack(&self, instruction: &Instruction, addr: &String, count: &String) -> String {
+    fn output_call_on_stack_safe(&self, instruction: &Instruction, addr: &String, count: &String) -> String {
         use Operand::*;
         match instruction.operands[1] {
             Constant(count) => {
@@ -226,7 +225,7 @@ impl GlulxOutput {
                 for _ in 0..count {
                     args.push(String::from("PopStack()"));
                 }
-                self.output_call(instruction, args, false)
+                self.output_call_safe(instruction, args, false)
             },
             _ => {
                 format!("CALL_FUNC(VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS({}, {}))", addr, count)

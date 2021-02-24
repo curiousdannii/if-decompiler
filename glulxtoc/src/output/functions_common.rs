@@ -40,6 +40,7 @@ impl GlulxOutput {
             OP_SHIFTL => self.runtime("OP_SHIFTL", args),
             OP_USHIFTR => self.runtime("OP_USHIFTR", args),
             OP_SSHIFTR => self.runtime("OP_SSHIFTR", args),
+            // OP_JUMP
             OP_JZ => format!("{} == 0", op_a),
             OP_JNZ => format!("{} != 0", op_a),
             OP_JEQ => format!("{} == {}", op_a, op_b),
@@ -52,7 +53,11 @@ impl GlulxOutput {
             OP_JGTU => format!("{} > {}", op_a, op_b),
             OP_JLEU => format!("{} <= {}", op_a, op_b),
             OP_JGEU => format!("{} >= {}", op_a, op_b),
-            OP_RETURN => format!("return {}", op_a),
+            // OP_CALL
+            // OP_RETURN
+            // OP_TAILCALL
+            // OP_CATCH
+            // OP_THROW
             OP_COPY | OP_COPYS | OP_COPYB => op_a.clone(),
             OP_SEXS => self.runtime("OP_SEXS", args),
             OP_SEXB => self.runtime("OP_SEXB", args),
@@ -69,6 +74,9 @@ impl GlulxOutput {
             OP_STKSWAP => self.runtime("OP_STKSWAP", args),
             OP_STKCOPY => self.runtime("OP_STKCOPY", args),
             OP_STKROLL => self.runtime("OP_STKROLL", args),
+            // OP_JUMPABS
+            // OP_CALLF ..= OP_CALLFIII
+            // OP_QUIT
             _ => null, // TODO panic here
         }
     }

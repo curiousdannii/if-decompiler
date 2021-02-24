@@ -75,12 +75,12 @@ impl<'a> Function {
         for index in 0..instructions_count {
             // Finish a previous block because this one starts a new one
             if self.entry_points.contains(&self.instructions[index].addr) && index != start_index {
-                basic_blocks.push(&self.instructions[start_index..(index - 1)]);
+                basic_blocks.push(&self.instructions[start_index..(index)]);
                 start_index = index;
             }
             // Make a basic block because this instruction exits
             if self.exit_points.contains(&self.instructions[index].addr) {
-                basic_blocks.push(&self.instructions[start_index..index]);
+                basic_blocks.push(&self.instructions[start_index..(index + 1)]);
                 start_index = index + 1;
             }
         }

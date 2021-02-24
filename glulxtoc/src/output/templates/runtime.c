@@ -249,3 +249,13 @@ void PushStack(glui32 storeval) {
     StkW4(stackptr, storeval);
     stackptr += 4;
 }
+
+glui32 ReadLocal(glui32 addr) {
+    addr += localsbase;
+    return Stk4(addr);
+}
+
+void StoreLocal(glui32 addr, glui32 value) {
+    addr += localsbase;
+    StkW4(addr, value);
+}

@@ -76,10 +76,10 @@ impl GlulxOutput {
             writeln!(header_file, "extern glui32 VM_FUNC_{}({});", addr, args_list)?;
         }
 
-        // Output the VM_FUNC_ARGUMENTS_COUNT function
-        writeln!(code_file, "int VM_FUNC_ARGUMENTS_COUNT(glui32 addr) {{
+        // Output the VM_FUNC_IS_SAFE function
+        writeln!(code_file, "int VM_FUNC_IS_SAFE(glui32 addr) {{
     switch (addr) {{")?;
-        for (count, funcs) in &safe_funcs {
+        for (_, funcs) in &safe_funcs {
             for row in funcs[..].chunks(5) {
                 write!(code_file, "        ")?;
                 let mut row_str = String::new();
@@ -89,10 +89,10 @@ impl GlulxOutput {
                 row_str.truncate(row_str.len() - 1);
                 writeln!(code_file, "{}", row_str)?;
             }
-            writeln!(code_file, "            return {};", count)?;
         }
-        writeln!(code_file, "        default:
-            return -1;
+        writeln!(code_file, "            return 1;
+        default:
+            return 0;
     }}
 }}
 ")?;

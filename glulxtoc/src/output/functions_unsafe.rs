@@ -30,7 +30,7 @@ impl GlulxOutput {
 #include \"glulxtoc.h\"
 
 void execute_loop(void) {{
-    glui32 *arglist;
+    glui32 callf_arg0, callf_arg1, callf_arg2;
     while (1) {{
         switch (pc) {{")?;
 
@@ -70,9 +70,11 @@ void execute_loop(void) {{
         let op_b = operands.get(1).unwrap_or(&null);
         use opcodes::*;
         let body = match opcode {
-            OP_CALL => self.output_call_on_stack_unsafe(instruction, op_a, op_b),
+            OP_CALL => output_call_unsafe(op_a, op_b, instruction.storer),
             OP_RETURN => format!("leave_function(); if (stackptr == 0) {{return;}} pop_callstub({}); break", op_a),
+            OP_TAILCALL => format!("VM_TAILCALL_FUNCTION({}, {}); if (stackptr == 0) {{return;}} break", op_a, op_b),
             OP_JUMPABS => format!("pc = {}; break", op_a),
+            OP_CALLF ..= OP_CALLFIII => output_callf_unsafe(instruction, operands),
             OP_QUIT => String::from("return"),
             _ => self.output_storer_unsafe(opcode, instruction.storer, self.output_common_instruction(instruction, operands)),
         };
@@ -110,13 +112,41 @@ void execute_loop(void) {{
             RAM(addr) => format!("{}({}, {})", func, addr + self.ramstart, inner),
         }
     }
+}
 
-    fn output_call_on_stack_unsafe(&self, instruction: &Instruction, addr: &String, count: &String) -> String {
-        use Operand::*;
-        match instruction.operands[1] {
-            _ => {
-                format!("arglist = pop_arguments({count}, 0); push_callstub(inst[2].desttype, inst[2].value); enter_function({addr}, {count}, arglist); break", addr=addr, count=count)
-            },
+fn output_call_unsafe(addr: &String, count: &String, storer: Operand) -> String {
+    format!("if (VM_CALL_FUNCTION({}, {}, {}, {})) {{break;}}", addr, count, storer_type(storer), storer_value(storer))
+}
+
+fn output_callf_unsafe(instruction: &Instruction, mut operands: Vec<String>) -> String {
+    let addr = operands.remove(0);
+    let count = operands.len();
+    let mut inner = Vec::new();
+    if count > 0 {
+        // Push the arguments in reverse order
+        for (i, operand) in operands.iter().enumerate() {
+            inner.push(format!("StkW4(stackptr + {}, {})", (count - i - 1) * 4, operand.clone()));
         }
+        inner.push(format!("stackptr += {}", count * 4));
+    }
+    inner.push(format!("VM_CALL_FUNCTION({}, {}, {}, {})", addr, count, storer_type(instruction.storer), storer_value(instruction.storer)));
+    format!("if ({}) {{break;}}", inner.join(", "))
+}
+
+fn storer_type(storer: Operand) -> u32 {
+    use Operand::*;
+    match storer {
+        Constant(_) => 0,
+        Memory(_) | RAM(_) => 1,
+        Local(_) => 2,
+        Stack => 3,
+    }
+}
+
+fn storer_value(storer: Operand) -> u32 {
+    use Operand::*;
+    match storer {
+        Constant(val) | Memory(val) | Local(val) | RAM(val) => val,
+        Stack => 0,
     }
 }

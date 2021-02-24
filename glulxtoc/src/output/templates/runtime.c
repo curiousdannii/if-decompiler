@@ -259,3 +259,32 @@ void StoreLocal(glui32 addr, glui32 value) {
     addr += localsbase;
     StkW4(addr, value);
 }
+
+int VM_CALL_FUNCTION(glui32 addr, glui32 count, glui32 storetype, glui32 storeval) {
+    glui32 *arglist;
+    int is_safe = VM_FUNC_IS_SAFE(addr);
+    if (is_safe == 0) {
+        arglist = pop_arguments(count, 0);
+        push_callstub(storetype, storeval);
+        enter_function(addr, count, arglist);
+        return 1;
+    }
+    glui32 result = VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(addr, count);
+    store_operand(storetype, storeval, result);
+    return 0;
+}
+
+void VM_TAILCALL_FUNCTION(glui32 addr, glui32 count) {
+    glui32 *arglist;
+    int is_safe = VM_FUNC_IS_SAFE(addr);
+    if (is_safe == 0) {
+        arglist = pop_arguments(count, 0);
+        leave_function();
+        enter_function(addr, count, arglist);
+    }
+    glui32 result = VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(addr, count);
+    leave_function();
+    if (stackptr != 0) {
+        pop_callstub(result);
+    }
+}

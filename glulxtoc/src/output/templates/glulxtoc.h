@@ -13,7 +13,7 @@ https://github.com/curiousdannii/if-decompiler
 
 // functions_safe.c
 extern glui32 VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(glui32 addr, glui32 count);
-extern int VM_FUNC_ARGUMENTS_COUNT(glui32 addr);
+extern int VM_FUNC_IS_SAFE(glui32 addr);
 
 // image.c
 #define GLULX_IMAGE_LENGTH IMAGE_LENGTH_VALUE
@@ -37,3 +37,5 @@ extern glui32 PopStack(void);
 extern void PushStack(glui32 storeval);
 extern glui32 ReadLocal(glui32 addr);
 extern void StoreLocal(glui32 addr, glui32 value);
+extern int VM_CALL_FUNCTION(glui32 addr, glui32 count, glui32 storetype, glui32 storeval);
+extern void VM_TAILCALL_FUNCTION(glui32 addr, glui32 count);

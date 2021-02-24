@@ -277,8 +277,7 @@ int VM_BRANCH(glui32 offset, glui32 next) {
 
 int VM_CALL_FUNCTION(glui32 addr, glui32 count, glui32 storetype, glui32 storeval) {
     glui32 *arglist;
-    int is_safe = VM_FUNC_IS_SAFE(addr);
-    if (is_safe == 0) {
+    if (!VM_FUNC_IS_SAFE(addr)) {
         arglist = pop_arguments(count, 0);
         push_callstub(storetype, storeval);
         enter_function(addr, count, arglist);
@@ -289,10 +288,26 @@ int VM_CALL_FUNCTION(glui32 addr, glui32 count, glui32 storetype, glui32 storeva
     return 0;
 }
 
+// Try to recover from an invalid unsafe PC by seeing if we can call a safe function
+int VM_JUMP_CALL(glui32 pc) {
+    pc -= 5;
+    if (VM_FUNC_IS_SAFE(pc)) {
+        glui32 locals = valstackbase - localsbase;
+        glui32 count = locals / 4;
+        // Push the locals in reverse order
+        while (locals > valstackbase) {
+            locals -= 4;
+            PushStack(ReadLocal(locals));
+        }
+        VM_TAILCALL_FUNCTION(pc, count);
+        return 1;
+    }
+    return 0;
+}
+
 void VM_TAILCALL_FUNCTION(glui32 addr, glui32 count) {
     glui32 *arglist;
-    int is_safe = VM_FUNC_IS_SAFE(addr);
-    if (is_safe == 0) {
+    if (!VM_FUNC_IS_SAFE(addr)) {
         arglist = pop_arguments(count, 0);
         leave_function();
         enter_function(addr, count, arglist);

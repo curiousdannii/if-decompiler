@@ -50,7 +50,12 @@ void execute_loop(void) {{
             }
         }
 
-        write!(code_file, "            default: fatal_error_i(\"Branched to invalid address:\", pc);
+        write!(code_file, "            default:
+                // Try to recover - if we are jumping into the first address of a safe function we can tailcall it
+                if (VM_JUMP_CALL(pc)) {{
+                    break;
+                }}
+                fatal_error_i(\"Branched to invalid address:\", pc);
         }}
     }}
 }}")?;

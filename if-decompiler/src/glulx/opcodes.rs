@@ -156,10 +156,12 @@ pub fn operands_count(opcode: u32, addr: u32) -> usize {
 }
 
 // Whether an instruction branches or jumps
-pub fn instruction_branches(opcode: u32) -> bool {
+pub fn instruction_branches(opcode: u32) -> BranchMode {
+    use BranchMode::*;
     match opcode {
-        OP_JUMP ..= OP_JLEU | OP_JUMPABS | OP_JFEQ ..= OP_JISINF => true,
-        _ => false,
+        OP_JZ ..= OP_JLEU | OP_JFEQ ..= OP_JISINF => Branches,
+        OP_JUMP | OP_JUMPABS => Jumps,
+        _ => DoesNotBranch,
     }
 }
 

@@ -207,9 +207,10 @@ impl GlulxState {
             instruction_addresses.insert(instruction.addr);
 
             // If this instruction branches, then update the entry and exit points
+            use Branch::*;
             match instruction.branch {
-                None => {},
-                Some(target) => {
+                DoesNotBranch => {},
+                Branches(target) | Jumps(target) => {
                     exit_points.insert(instruction.addr);
                     match target {
                         BranchTarget::Absolute(addr) => {
@@ -308,26 +309,29 @@ impl GlulxState {
         }
 
         // Calculate branch targets
-        let branch = match opcodes::instruction_branches(opcode) {
-            false => None,
-            true => {
-                Some(match *operands.last().unwrap() {
-                    Constant(target) => {
-                        if opcode == opcodes::OP_JUMPABS {
-                            BranchTarget::Absolute(target)
+        use BranchTarget::*;
+        let calc_branch = || -> BranchTarget {
+            match *operands.last().unwrap() {
+                Constant(target) => {
+                    if opcode == opcodes::OP_JUMPABS {
+                        Absolute(target)
+                    }
+                    else {
+                        if target == 0 || target == 1 {
+                            Return(target)
                         }
                         else {
-                            if target == 0 || target == 1 {
-                                BranchTarget::Return(target)
-                            }
-                            else {
-                                BranchTarget::Absolute((cursor.position() as i32 + target as i32 - 2) as u32)
-                            }
+                            Absolute((cursor.position() as i32 + target as i32 - 2) as u32)
                         }
-                    },
-                    _ => BranchTarget::Dynamic,
-                })
-            },
+                    }
+                },
+                _ => Dynamic,
+            }
+        };
+        let branch = match opcodes::instruction_branches(opcode) {
+            BranchMode::DoesNotBranch => Branch::DoesNotBranch,
+            BranchMode::Branches => Branch::Branches(calc_branch()),
+            BranchMode::Jumps => Branch::Jumps(calc_branch()),
         };
 
         // Extract the storer(s) - in reverse order (makes it simpler for OP_FMOD)
@@ -346,6 +350,7 @@ impl GlulxState {
             branch,
             storer,
             storer2,
+            next: cursor.position() as u32,
         }
     }
 }

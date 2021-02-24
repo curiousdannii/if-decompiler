@@ -30,7 +30,6 @@ impl GlulxOutput {
 #include \"glulxtoc.h\"
 
 void execute_loop(void) {{
-    glui32 callf_arg0, callf_arg1, callf_arg2;
     while (1) {{
         switch (pc) {{")?;
 
@@ -70,15 +69,16 @@ void execute_loop(void) {{
         let op_b = operands.get(1).unwrap_or(&null);
         use opcodes::*;
         let body = match opcode {
+            OP_JUMP => String::new(),
             OP_CALL => output_call_unsafe(op_a, op_b, instruction.storer),
             OP_RETURN => format!("leave_function(); if (stackptr == 0) {{return;}} pop_callstub({}); break", op_a),
             OP_TAILCALL => format!("VM_TAILCALL_FUNCTION({}, {}); if (stackptr == 0) {{return;}} break", op_a, op_b),
-            OP_JUMPABS => format!("pc = {}; break", op_a),
+            OP_JUMPABS => String::new(),
             OP_CALLF ..= OP_CALLFIII => output_callf_unsafe(instruction, operands),
             OP_QUIT => String::from("return"),
             _ => self.output_storer_unsafe(opcode, instruction.storer, self.output_common_instruction(instruction, operands)),
         };
-        body
+        self.output_branch(instruction, body)
     }
 
     // Map operands into strings
@@ -110,6 +110,33 @@ void execute_loop(void) {{
             Stack => format!("PushStack({})", inner),
             Local(addr) => format!("StoreLocal({}, {})", addr, inner),
             RAM(addr) => format!("{}({}, {})", func, addr + self.ramstart, inner),
+        }
+    }
+
+    fn output_branch(&self, instruction: &Instruction, condition: String) -> String {
+        use Branch::*;
+        match instruction.branch {
+            DoesNotBranch => condition,
+            Branches(branch) => {
+                let action = self.output_branch_action(instruction, branch);
+                format!("if ({}) {{{}; break;}}", condition, action)
+            },
+            Jumps(branch) => {
+                if instruction.opcode == opcodes::OP_JUMP {
+                    format!("{}; break", self.output_branch_action(instruction, branch))
+                } else {
+                    format!("pc = {}; break", self.output_operand_unsafe(*instruction.operands.last().unwrap()))
+                }
+            },
+        }
+    }
+
+    fn output_branch_action(&self, instruction: &Instruction, branch: BranchTarget) -> String {
+        use BranchTarget::*;
+        match branch {
+            Dynamic => format!("if (VM_BRANCH({}, {})) {{return;}}", self.output_operand_unsafe(*instruction.operands.last().unwrap()), instruction.next),
+            Absolute(addr) => format!("pc = {}", addr),
+            Return(val) => format!("leave_function(); if (stackptr == 0) {{return;}} pop_callstub({})", val),
         }
     }
 }

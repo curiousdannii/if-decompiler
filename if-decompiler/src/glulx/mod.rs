@@ -101,10 +101,11 @@ pub struct Instruction {
     pub addr: u32,
     pub opcode: u32,
     pub operands: Vec<Operand>,
-    pub branch: Option<BranchTarget>,
+    pub branch: Branch,
     // These could be inside an Option, but we can just set them to Constants if the instruction doesn't store
     pub storer: Operand,
     pub storer2: Operand,
+    pub next: u32,
 }
 
 #[derive(Copy, Clone)]
@@ -122,6 +123,13 @@ pub enum StoreMode {
     LastOperand,
     FirstOperand,
     LastTwoOperands,
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum BranchMode {
+    DoesNotBranch,
+    Branches,
+    Jumps,
 }
 
 pub enum DecodingNode {

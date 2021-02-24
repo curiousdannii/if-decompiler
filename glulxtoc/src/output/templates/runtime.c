@@ -260,6 +260,21 @@ void StoreLocal(glui32 addr, glui32 value) {
     StkW4(addr, value);
 }
 
+int VM_BRANCH(glui32 offset, glui32 next) {
+    if (offset == 0 || offset == 1)
+    {
+        leave_function();
+        if (stackptr == 0)
+        {
+            return 1;
+        }
+        pop_callstub(offset);
+    } else {
+        pc = pc + (glsi32) offset - 2;
+    }
+    return 0;
+}
+
 int VM_CALL_FUNCTION(glui32 addr, glui32 count, glui32 storetype, glui32 storeval) {
     glui32 *arglist;
     int is_safe = VM_FUNC_IS_SAFE(addr);

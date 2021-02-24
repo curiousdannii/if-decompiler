@@ -55,6 +55,13 @@ pub trait VirtualMachine {
 }
 
 #[derive(Copy, Clone, PartialEq)]
+pub enum Branch {
+    DoesNotBranch,
+    Branches(BranchTarget),
+    Jumps(BranchTarget),
+}
+
+#[derive(Copy, Clone, PartialEq)]
 pub enum BranchTarget {
     Dynamic,
     Absolute(u32),

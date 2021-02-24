@@ -37,5 +37,6 @@ extern glui32 PopStack(void);
 extern void PushStack(glui32 storeval);
 extern glui32 ReadLocal(glui32 addr);
 extern void StoreLocal(glui32 addr, glui32 value);
+extern int VM_BRANCH(glui32 offset, glui32 next);
 extern int VM_CALL_FUNCTION(glui32 addr, glui32 count, glui32 storetype, glui32 storeval);
 extern void VM_TAILCALL_FUNCTION(glui32 addr, glui32 count);

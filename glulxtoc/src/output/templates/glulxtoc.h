@@ -39,6 +39,7 @@ extern void OP_MZERO(glui32 arg0, glui32 arg1);
 extern void OP_MCOPY(glui32 arg0, glui32 arg1, glui32 arg2);
 extern glsi32 OP_FTONUMZ(glui32 arg0);
 extern glsi32 OP_FTONUMN(glui32 arg0);
+extern void OP_FMOD(glui32 arg0, glui32 arg1, glui32 *dest0, glui32 *dest1);
 extern glui32 OP_CEIL(glui32 arg0);
 extern glui32 OP_JFEQ(glui32 arg0, glui32 arg1, glui32 arg2);
 extern glui32 PopStack(void);

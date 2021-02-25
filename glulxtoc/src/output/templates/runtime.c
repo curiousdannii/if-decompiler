@@ -313,6 +313,22 @@ glsi32 OP_FTONUMN(glui32 arg0) {
     }
 }
 
+void OP_FMOD(glui32 arg0, glui32 arg1, glui32 *dest0, glui32 *dest1) {
+    gfloat32 valf1 = decode_float(arg0);
+    gfloat32 valf2 = decode_float(arg1);
+    gfloat32 valf = fmodf(valf1, valf2);
+    glui32 val0 = encode_float(valf);
+    glui32 val1 = encode_float((valf1 - valf) / valf2);
+    if (val1 == 0x0 || val1 == 0x80000000) {
+        /* When the quotient is zero, the sign has been lost in the
+            shuffle. We'll set that by hand, based on the original
+            arguments. */
+        val1 = (arg0 ^ arg1) & 0x80000000;
+    }
+    *dest0 = val0;
+    *dest1 = val1;
+}
+
 glui32 OP_CEIL(glui32 arg0) {
     gfloat32 valf = decode_float(arg0);
     glui32 value = encode_float(ceilf(valf));

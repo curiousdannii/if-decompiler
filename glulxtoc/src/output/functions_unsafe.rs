@@ -82,7 +82,9 @@ void execute_loop(void) {{
             OP_TAILCALL => format!("VM_TAILCALL_FUNCTION({}, {}); if (stackptr == 0) {{return;}} break", op_a, op_b),
             OP_JUMPABS => String::new(),
             OP_CALLF ..= OP_CALLFIII => output_callf_unsafe(instruction, operands),
+            OP_GETIOSYS => self.output_double_storer_unsafe(instruction, String::from("stream_get_iosys(&temp0, &temp1)")),
             OP_QUIT => String::from("return"),
+            OP_FMOD => self.output_double_storer_unsafe(instruction, format!("OP_FMOD({}, {}, &temp0, &temp1)", op_a, op_b)),
             _ => self.output_storer_unsafe(opcode, instruction.storer, self.output_common_instruction(instruction, operands)),
         };
         self.output_branch(instruction, body)
@@ -118,6 +120,20 @@ void execute_loop(void) {{
             Local(addr) => format!("StoreLocal({}, {})", addr, inner),
             RAM(addr) => format!("{}({}, {})", func, addr + self.ramstart, inner),
         }
+    }
+
+    fn output_double_storer_unsafe(&self, instruction: &Instruction, inner: String) -> String {
+        use Operand::*;
+        let store = |storer: Operand, i: u32| {
+            match storer {
+                Constant(_) => String::from("NULL"),
+                Memory(addr) => format!("MemW4({}, temp{})", addr, i),
+                Stack => format!("PushStack(temp{})", i),
+                Local(addr) => format!("StoreLocal({}, temp{})", addr, i),
+                RAM(addr) => format!("MemW4({}, temp{})", addr + self.ramstart, i),
+            }
+        };
+        format!("{}; {}; {}", inner, store(instruction.storer, 0), store(instruction.storer2, 1))
     }
 
     fn output_branch(&self, instruction: &Instruction, condition: String) -> String {

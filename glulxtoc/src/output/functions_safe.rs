@@ -132,6 +132,8 @@ impl GlulxOutput {
             OP_RETURN => format!("return {}", op_a),
             OP_TAILCALL => format!("return {}", self.output_call_on_stack_safe(instruction, op_a, op_b)),
             OP_CALLF ..= OP_CALLFIII => self.output_callf_safe(instruction, operands),
+            OP_GETIOSYS => self.output_double_storer_safe(instruction, String::from("stream_get_iosys(&temp0, &temp1)")),
+            OP_FMOD => self.output_double_storer_safe(instruction, format!("OP_FMOD({}, {}, &temp0, &temp1)", op_a, op_b)),
             _ => self.output_common_instruction(instruction, operands),
         };
         self.output_storer_safe(opcode, instruction.storer, body)
@@ -154,10 +156,15 @@ impl GlulxOutput {
     }
 
     fn output_storer_safe(&self, opcode: u32, storer: Operand, inner: String) -> String {
+        use opcodes::*;
+        // The double store opcodes are handled separately
+        if opcode == OP_GETIOSYS || opcode == OP_FMOD {
+            return inner;
+        }
         use Operand::*;
         let func = match opcode {
-            opcodes::OP_COPYS => "MemW2",
-            opcodes::OP_COPYB => "MemW1",
+            OP_COPYS => "MemW2",
+            OP_COPYB => "MemW1",
             _ => "MemW4",
         };
         match storer {
@@ -167,6 +174,20 @@ impl GlulxOutput {
             Local(val) => format!("l{} = {}", val / 4, inner),
             RAM(addr) => format!("{}({}, {})", func, addr + self.ramstart, inner),
         }
+    }
+
+    fn output_double_storer_safe(&self, instruction: &Instruction, inner: String) -> String {
+        use Operand::*;
+        let store = |storer: Operand, i: u32| {
+            match storer {
+                Constant(_) => String::from("NULL"),
+                Memory(addr) => format!("MemW4({}, temp{})", addr, i),
+                Stack => format!("PushStack(temp{})", i),
+                Local(val) => format!("l{} = temp{}", val / 4, i),
+                RAM(addr) => format!("MemW4({}, temp{})", addr + self.ramstart, i),
+            }
+        };
+        format!("{}; {}; {}", inner, store(instruction.storer, 0), store(instruction.storer2, 1))
     }
 
     // Construct a call

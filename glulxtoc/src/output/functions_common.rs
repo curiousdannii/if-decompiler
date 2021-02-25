@@ -92,6 +92,8 @@ impl GlulxOutput {
             OP_GLK => format!("(temp0 = {}, temp1 = {}, perform_glk(temp0, temp1, pop_arguments(temp1, 0)))", op_a, op_b),
             OP_RANDOM => self.runtime("OP_RANDOM", args),
             OP_SETRANDOM => self.runtime("glulx_setrandom", args),
+            OP_VERIFY => self.runtime("perform_verify", args),
+            // OP_RESTART
             OP_PROTECT => self.runtime("OP_PROTECT", args),
             // OP_SAVE
             // OP_RESTORE

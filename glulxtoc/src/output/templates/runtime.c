@@ -106,6 +106,13 @@ glui32 OP_SSHIFTR(glui32 arg0, glui32 arg1) {
     return (glsi32) arg0 >> (glsi32) vals0;
 }
 
+int OP_CATCH(glui32 next, glui32 storetype, glui32 storeval) {
+    pc = next;
+    push_callstub(storetype, storeval);
+    store_operand(storetype, storeval, stackptr);
+    return 1;
+}
+
 glui32 OP_SEXS(glui32 arg0) {
     if (arg0 & 0x8000)
     {
@@ -256,6 +263,52 @@ void OP_PROTECT(glui32 arg0, glui32 arg1) {
     protectend = val1;
 }
 
+void OP_SAVE(glui32 arg0, glui32 next, glui32 storetype, glui32 storeval) {
+    pc = next;
+    push_callstub(storetype, storeval);
+    pop_callstub(perform_save(find_stream_by_id(arg0)));
+}
+
+int OP_RESTORE(glui32 arg0, glui32 storetype, glui32 storeval) {
+    glui32 value = perform_restore(find_stream_by_id(arg0), FALSE);
+    if (value == 0) {
+        /* We've succeeded, and the stack now contains the callstub
+            saved during saveundo. Ignore this opcode's operand. */
+        value = -1;
+        pop_callstub(value);
+        return 1;
+    }
+    else {
+        /* We've failed, so we must store the failure in this opcode's
+            operand. */
+        store_operand(storetype, storeval, value);
+        return 0;
+    }
+}
+
+void OP_SAVEUNDO(glui32 next, glui32 storetype, glui32 storeval) {
+    pc = next;
+    push_callstub(storetype, storeval);
+    pop_callstub(perform_saveundo());
+}
+
+int OP_RESTOREUNDO(glui32 storetype, glui32 storeval) {
+    glui32 value = perform_restoreundo();
+    if (value == 0) {
+        /* We've succeeded, and the stack now contains the callstub
+            saved during saveundo. Ignore this opcode's operand. */
+        value = -1;
+        pop_callstub(value);
+        return 1;
+    }
+    else {
+        /* We've failed, so we must store the failure in this opcode's
+            operand. */
+        store_operand(storetype, storeval, value);
+        return 0;
+    }
+}
+
 void OP_MZERO(glui32 arg0, glui32 arg1) {
     glui32 lx;
     for (lx=0; lx < arg0; lx++, arg1++) {
@@ -393,7 +446,7 @@ int VM_BRANCH(glui32 offset, glui32 next) {
         }
         pop_callstub(offset);
     } else {
-        pc = pc + (glsi32) offset - 2;
+        pc = next + (glsi32) offset - 2;
     }
     return 0;
 }

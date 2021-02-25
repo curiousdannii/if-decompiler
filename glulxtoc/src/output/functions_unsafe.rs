@@ -80,9 +80,16 @@ void execute_loop(void) {{
             OP_CALL => output_call_unsafe(op_a, op_b, instruction.storer),
             OP_RETURN => format!("leave_function(); if (stackptr == 0) {{return;}} pop_callstub({}); break", op_a),
             OP_TAILCALL => format!("VM_TAILCALL_FUNCTION({}, {}); if (stackptr == 0) {{return;}} break", op_a, op_b),
+            OP_CATCH => format!("OP_CATCH({}, {}, {})", instruction.next, storer_type(instruction.storer), storer_value(instruction.storer)),
+            OP_THROW => format!("temp0 = {}; stackptr = {}; pop_callstub(temp0); break", op_a, op_b),
             OP_JUMPABS => String::new(),
             OP_CALLF ..= OP_CALLFIII => output_callf_unsafe(instruction, operands),
             OP_GETIOSYS => self.output_double_storer_unsafe(instruction, String::from("stream_get_iosys(&temp0, &temp1)")),
+            OP_RESTART => String::from("vm_restart(); break"),
+            OP_SAVE => format!("OP_SAVE({}, {}, {}, {})", op_a, instruction.next, storer_type(instruction.storer), storer_value(instruction.storer)),
+            OP_RESTORE => format!("if (OP_RESTORE({}, {}, {})) {{break;}}", op_a, storer_type(instruction.storer), storer_value(instruction.storer)),
+            OP_SAVEUNDO => format!("OP_SAVEUNDO({}, {}, {})", instruction.next, storer_type(instruction.storer), storer_value(instruction.storer)),
+            OP_RESTOREUNDO => format!("if (OP_RESTOREUNDO({}, {})) {{break;}}", storer_type(instruction.storer), storer_value(instruction.storer)),
             OP_QUIT => String::from("return"),
             OP_FMOD => self.output_double_storer_unsafe(instruction, format!("OP_FMOD({}, {}, &temp0, &temp1)", op_a, op_b)),
             _ => self.output_storer_unsafe(opcode, instruction.storer, self.output_common_instruction(instruction, operands)),
@@ -138,6 +145,7 @@ void execute_loop(void) {{
 
     fn output_branch(&self, instruction: &Instruction, condition: String) -> String {
         use Branch::*;
+        use opcodes::*;
         match instruction.branch {
             DoesNotBranch => condition,
             Branches(branch) => {
@@ -145,10 +153,11 @@ void execute_loop(void) {{
                 format!("if ({}) {{{}; break;}}", condition, action)
             },
             Jumps(branch) => {
-                if instruction.opcode == opcodes::OP_JUMP {
-                    format!("{}; break", self.output_branch_action(instruction, branch))
-                } else {
-                    format!("pc = {}; break", self.output_operand_unsafe(*instruction.operands.last().unwrap()))
+                match instruction.opcode {
+                    OP_JUMP => format!("{}; break", self.output_branch_action(instruction, branch)),
+                    OP_CATCH => format!("{}; {}; break", condition, self.output_branch_action(instruction, branch)),
+                    OP_JUMPABS => format!("pc = {}; break", self.output_operand_unsafe(*instruction.operands.last().unwrap())),
+                    _ => panic!(),
                 }
             },
         }

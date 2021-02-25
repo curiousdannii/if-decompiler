@@ -160,7 +160,7 @@ pub fn instruction_branches(opcode: u32) -> BranchMode {
     use BranchMode::*;
     match opcode {
         OP_JZ ..= OP_JLEU | OP_JFEQ ..= OP_JISINF => Branches,
-        OP_JUMP | OP_JUMPABS => Jumps,
+        OP_JUMP | OP_CATCH | OP_JUMPABS => Jumps,
         _ => DoesNotBranch,
     }
 }

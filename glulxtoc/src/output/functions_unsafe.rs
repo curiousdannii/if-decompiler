@@ -28,8 +28,10 @@ impl GlulxOutput {
         writeln!(code_file, "#include \"glk.h\"
 #include \"glulxe.h\"
 #include \"glulxtoc.h\"
+#include <math.h>
 
 void execute_loop(void) {{
+    glui32 temp0, temp1;
     while (1) {{
         switch (pc) {{")?;
 

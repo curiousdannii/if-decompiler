@@ -65,7 +65,7 @@ pub const OP_STREAMCHAR: u32 = 0x70;
 pub const OP_STREAMNUM: u32 = 0x71;
 pub const OP_STREAMSTR: u32 = 0x72;
 pub const OP_STREAMUNICHAR: u32 = 0x73;
-pub const OP_GETSTALT: u32 = 0x100;
+pub const OP_GESTALT: u32 = 0x100;
 pub const OP_DEBUGTRAP: u32 = 0x101;
 pub const OP_GETMEMSIZE: u32 = 0x102;
 pub const OP_SETMEMSIZE: u32 = 0x103;
@@ -144,7 +144,7 @@ pub fn operands_count(opcode: u32, addr: u32) -> usize {
             | OP_ACCELPARAM | OP_NUMTOF ..= OP_FLOOR | OP_SQRT ..= OP_LOG
             | OP_SIN ..= OP_ATAN | OP_JISNAN | OP_JISINF => 2,
         OP_ADD ..= OP_MOD | OP_BITAND ..= OP_BITXOR  | OP_SHIFTL ..= OP_USHIFTR
-            | OP_JEQ ..= OP_CALL | OP_ALOAD ..= OP_ASTOREBIT | OP_GETSTALT
+            | OP_JEQ ..= OP_CALL | OP_ALOAD ..= OP_ASTOREBIT | OP_GESTALT
             | OP_GLK | OP_CALLFI | OP_MCOPY | OP_FADD ..= OP_FDIV | OP_POW
             | OP_ATAN2 | OP_JFLT ..= OP_JFGE => 3,
         OP_CALLFII | OP_FMOD | OP_JFEQ | OP_JFNE => 4,
@@ -187,7 +187,7 @@ pub fn instruction_stores(opcode: u32) -> StoreMode {
     use StoreMode::*;
     match opcode {
         OP_ADD ..= OP_USHIFTR | OP_CALL | OP_COPY ..= OP_ALOADBIT
-            | OP_STKCOUNT ..= OP_STKPEEK | OP_GETSTALT | OP_GETMEMSIZE
+            | OP_STKCOUNT ..= OP_STKPEEK | OP_GESTALT | OP_GETMEMSIZE
             | OP_SETMEMSIZE | OP_RANDOM | OP_VERIFY
             | OP_SAVE ..= OP_RESTOREUNDO | OP_GLK | OP_GETSTRINGTBL
             | OP_LINEARSEARCH ..= OP_CALLFIII | OP_MALLOC | OP_NUMTOF ..= OP_FDIV
@@ -203,8 +203,7 @@ pub fn function_safety(instructions: &Vec<Instruction>) -> FunctionSafety {
     use FunctionSafety::*;
     for instruction in instructions {
         match instruction.opcode {
-            OP_CATCH | OP_THROW | OP_RESTORE | OP_RESTOREUNDO => continue,
-            OP_QUIT | OP_RESTART => return Unsafe,
+            OP_CATCH | OP_THROW | OP_QUIT | OP_RESTART ..= OP_RESTOREUNDO => return Unsafe,
 
             // Calls to non-constants are unsafe
             OP_CALL | OP_TAILCALL | OP_CALLF ..= OP_CALLFIII => match instruction.operands[0] {

@@ -26,6 +26,7 @@ impl GlulxOutput {
         let op_b = args.get(1).unwrap_or(&null);
         use opcodes::*;
         match opcode {
+            // Following the order of glulxe's exec.c, not strict numerical order
             OP_NOP => String::new(),
             OP_ADD => self.args_join(args, " + "),
             OP_SUB => self.args_join(args, " - "),
@@ -74,9 +75,67 @@ impl GlulxOutput {
             OP_STKSWAP => self.runtime("OP_STKSWAP", args),
             OP_STKCOPY => self.runtime("OP_STKCOPY", args),
             OP_STKROLL => self.runtime("OP_STKROLL", args),
+            OP_STREAMCHAR => format!("(*stream_char_handler)({} & 0xFF)", op_a),
+            OP_STREAMNUM => format!("stream_num((glsi32) {}, FALSE, 0)", op_a),
+            OP_STREAMSTR => format!("stream_string({}, 0, 0)", op_a),
+            OP_STREAMUNICHAR => format!("(*stream_unichar_handler)({})", op_a),
+            OP_GESTALT => self.runtime("do_gestalt", args),
+            OP_DEBUGTRAP => format!("fatal_error_i(\"user debugtrap encountered.\", {})", op_a),
             // OP_JUMPABS
             // OP_CALLF ..= OP_CALLFIII
+            OP_GETMEMSIZE => String::from("endmem"),
+            OP_SETMEMSIZE => format!("change_memsize({}, 0)", op_a),
+            OP_GETSTRINGTBL => String::from("stream_get_table()"),
+            OP_SETSTRINGTBL => self.runtime("stream_set_table", args),
+            // OP_GETIOSYS
+            OP_SETIOSYS => self.runtime("stream_set_iosys", args),
+            OP_GLK => format!("(temp0 = {}, temp1 = {}, perform_glk(temp0, temp1, pop_arguments(temp1, 0)))", op_a, op_b),
+            OP_RANDOM => self.runtime("OP_RANDOM", args),
+            OP_SETRANDOM => self.runtime("glulx_setrandom", args),
+            OP_PROTECT => self.runtime("OP_PROTECT", args),
+            // OP_SAVE
+            // OP_RESTORE
+            // OP_SAVEUNDO
+            // OP_RESTOREUNDO
             // OP_QUIT
+            OP_LINEARSEARCH => self.runtime("linear_search", args),
+            OP_BINARYSEARCH => self.runtime("binary_search", args),
+            OP_LINKEDSEARCH => self.runtime("linked_search", args),
+            OP_MZERO => self.runtime("OP_MZERO", args),
+            OP_MCOPY => self.runtime("OP_MCOPY", args),
+            OP_MALLOC => self.runtime("heap_alloc", args),
+            OP_MFREE => self.runtime("heap_free", args),
+            OP_ACCELFUNC => String::from(""),
+            OP_ACCELPARAM => String::from(""),
+            OP_NUMTOF => format!("encode_float((gfloat32) ((glsi32) {}))", op_a),
+            OP_FTONUMZ => self.runtime("OP_FTONUMZ", args),
+            OP_FTONUMN => self.runtime("OP_FTONUMN", args),
+            OP_FADD => format!("encode_float(decode_float({}) + decode_float({}))", op_a, op_b),
+            OP_FSUB => format!("encode_float(decode_float({}) - decode_float({}))", op_a, op_b),
+            OP_FMUL => format!("encode_float(decode_float({}) * decode_float({}))", op_a, op_b),
+            OP_FDIV => format!("encode_float(decode_float({}) / decode_float({}))", op_a, op_b),
+            // OP_FMOD
+            OP_FLOOR => runtime_float("floorf", op_a),
+            OP_CEIL => self.runtime("OP_CEIL", args),
+            OP_SQRT => runtime_float("sqrtf", op_a),
+            OP_LOG => runtime_float("logf", op_a),
+            OP_EXP => runtime_float("expf", op_a),
+            OP_POW => format!("encode_float(glulx_powf(decode_float({}), decode_float({})))", op_a, op_b),
+            OP_SIN => runtime_float("sinf", op_a),
+            OP_COS => runtime_float("cosf", op_a),
+            OP_TAN => runtime_float("tanf", op_a),
+            OP_ASIN => runtime_float("asinf", op_a),
+            OP_ACOS => runtime_float("acosf", op_a),
+            OP_ATAN => runtime_float("atanf", op_a),
+            OP_ATAN2 => format!("encode_float(atan2f(decode_float({}), decode_float({})))", op_a, op_b),
+            OP_JISINF => format!("temp0 = {}, temp0 == 0x7F800000 || temp0 == 0xFF800000", op_a),
+            OP_JISNAN => format!("temp0 = {}, (temp0 & 0x7F800000) == 0x7F800000 && (temp0 & 0x007FFFFF) != 0", op_a),
+            OP_JFEQ => format!("OP_JFEQ({}, {}, {})", op_a, op_b, args[2]),
+            OP_JFNE => format!("!OP_JFEQ({}, {}, {})", op_a, op_b, args[2]),
+            OP_JFLT => format!("decode_float({}) < decode_float({})", op_a, op_b),
+            OP_JFGT => format!("decode_float({}) > decode_float({})", op_a, op_b),
+            OP_JFLE => format!("decode_float({}) <= decode_float({})", op_a, op_b),
+            OP_JFGE => format!("decode_float({}) >= decode_float({})", op_a, op_b),
             _ => null, // TODO panic here
         }
     }
@@ -98,4 +157,8 @@ impl GlulxOutput {
         format!("{}({})", name, self.args(operands))
     }
 
+}
+
+fn runtime_float(func: &str, operand: &String) -> String {
+    format!("encode_float({}(decode_float({})))", func, operand)
 }

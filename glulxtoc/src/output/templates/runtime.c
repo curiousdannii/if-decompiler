@@ -13,6 +13,7 @@ https://github.com/curiousdannii/if-decompiler
 #include "glk.h"
 #include "glulxe.h"
 #include "glulxtoc.h"
+#include <math.h>
 
 glui32 OP_DIV(glui32 arg0, glui32 arg1) {
     glsi32 dividend = (glsi32) arg0;
@@ -231,6 +232,112 @@ void OP_STKROLL(glui32 arg0, glui32 arg1) {
     for (glui32 ix=0; ix < vals0; ix++) {
         glui32 value = Stk4(addr + (vals1 + ix) * 4);
         StkW4(addr + ix * 4, value);
+    }
+}
+
+glui32 OP_RANDOM(glui32 arg0) {
+    glsi32 vals0 = (glsi32) arg0;
+    if (vals0 == 0) {
+        return glulx_random();
+    } else if (vals0 >= 1) {
+        return glulx_random() % (glui32) (vals0);
+    } else  {
+        return -(glulx_random() % (glui32) (-vals0));
+    }
+}
+
+void OP_PROTECT(glui32 arg0, glui32 arg1) {
+    glui32 val1 = arg0 + arg1;
+    if (arg0 == val1) {
+        arg0 = 0;
+        val1 = 0;
+    }
+    protectstart = arg0;
+    protectend = val1;
+}
+
+void OP_MZERO(glui32 arg0, glui32 arg1) {
+    glui32 lx;
+    for (lx=0; lx < arg0; lx++, arg1++) {
+        MemW1(arg1, 0);
+    }
+}
+
+void OP_MCOPY(glui32 arg0, glui32 arg1, glui32 arg2) {
+    glui32 lx;
+    if (arg2 < arg1) {
+        for (lx = 0; lx < arg0; lx++, arg1++, arg2++) {
+            MemW1(arg2, Mem1(arg1));
+        }
+    }
+    else {
+        arg1 += (arg0 - 1);
+        arg2 += (arg0 - 1);
+        for (lx = 0; lx < arg0; lx++, arg1--, arg2--) {
+            MemW1(arg2, Mem1(arg1));
+        }
+    }
+}
+
+glsi32 OP_FTONUMZ(glui32 arg0) {
+    gfloat32 valf = decode_float(arg0);
+    if (!signbit(valf)) {
+        if (isnan(valf) || isinf(valf) || (valf > 2147483647.0)) {
+            return 0x7FFFFFFF;
+        } else {
+            return (glsi32) (truncf(valf));
+        }
+    } else {
+        if (isnan(valf) || isinf(valf) || (valf < -2147483647.0)) {
+            return 0x80000000;
+        } else {
+            return (glsi32) (truncf(valf));
+        }
+    }
+}
+
+glsi32 OP_FTONUMN(glui32 arg0) {
+    gfloat32 valf = decode_float(arg0);
+    if (!signbit(valf)) {
+        if (isnan(valf) || isinf(valf) || (valf > 2147483647.0)) {
+            return 0x7FFFFFFF;
+        } else {
+            return (glsi32) (roundf(valf));
+        }
+    } else {
+        if (isnan(valf) || isinf(valf) || (valf < -2147483647.0)) {
+            return 0x80000000;
+        } else {
+            return (glsi32) (roundf(valf));
+        }
+    }
+}
+
+glui32 OP_CEIL(glui32 arg0) {
+    gfloat32 valf = decode_float(arg0);
+    glui32 value = encode_float(ceilf(valf));
+    if (value == 0x0 || value == 0x80000000) {
+        /* When the result is zero, the sign may have been lost in the
+            shuffle. (This is a bug in some C libraries.) We'll set the
+            sign by hand, based on the original argument. */
+        value = arg0 & 0x80000000;
+    }
+    return value;
+}
+
+glui32 OP_JFEQ(glui32 arg0, glui32 arg1, glui32 arg2) {
+    if ((arg2 & 0x7F800000) == 0x7F800000 && (arg2 & 0x007FFFFF) != 0) {
+        /* The delta is NaN, which can never match. */
+        return 0;
+    } else if ((arg0 == 0x7F800000 || arg0 == 0xFF800000)
+        && (arg1 == 0x7F800000 || arg1 == 0xFF800000)) {
+        /* Both are infinite. Opposite infinities are never equal,
+            even if the difference is infinite, so this is easy. */
+        return (arg0 == arg1);
+    } else {
+        gfloat32 valf1 = decode_float(arg1) - decode_float(arg0);
+        gfloat32 valf2 = fabs(decode_float(arg2));
+        return (valf1 <= valf2 && valf1 >= -valf2);
     }
 }
 

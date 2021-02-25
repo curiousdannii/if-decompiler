@@ -31,6 +31,7 @@ impl GlulxOutput {
 #include \"glk.h\"
 #include \"glulxe.h\"
 #include \"glulxtoc.h\"
+#include <math.h>
 
 #define CALL_FUNC(code) (oldsp = stackptr, oldvsb = valstackbase, res = code, stackptr = oldsp, valstackbase = oldvsb, res)
 
@@ -63,7 +64,7 @@ impl GlulxOutput {
             let function_spec = format!("glui32 VM_FUNC_{}({})", addr, args_list);
 
             writeln!(code_file, "{} {{
-    glui32 arg, oldsp, oldvsb, res;
+    glui32 arg, oldsp, oldvsb, res, temp0, temp1;
     valstackbase = stackptr;", function_spec)?;
             for instruction in &function.instructions {
                 writeln!(code_file, "    /* {:>3X}/{} */ {};", instruction.opcode, instruction.addr, self.output_instruction_safe(instruction))?;

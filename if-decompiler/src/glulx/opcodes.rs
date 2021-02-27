@@ -155,12 +155,19 @@ pub fn operands_count(opcode: u32, addr: u32) -> usize {
     }
 }
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum BranchMode {
+    DoesNotBranch,
+    Branches,
+    Jumps,
+}
+
 // Whether an instruction branches or jumps
 pub fn instruction_branches(opcode: u32) -> BranchMode {
     use BranchMode::*;
     match opcode {
-        OP_JZ ..= OP_JLEU | OP_JFEQ ..= OP_JISINF => Branches,
-        OP_JUMP | OP_CATCH | OP_JUMPABS => Jumps,
+        OP_JZ ..= OP_JLEU | OP_CATCH | OP_JFEQ ..= OP_JISINF => Branches,
+        OP_JUMP | OP_JUMPABS => Jumps,
         _ => DoesNotBranch,
     }
 }
@@ -180,6 +187,14 @@ pub fn instruction_halts(opcode: u32) -> bool {
             | OP_RESTART => true,
         _ => false,
     }
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum StoreMode {
+    DoesNotStore,
+    LastOperand,
+    FirstOperand,
+    LastTwoOperands,
 }
 
 // Whether an instruction stores

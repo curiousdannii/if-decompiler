@@ -43,11 +43,10 @@ void execute_loop(void) {{
 
             writeln!(code_file, "            // VM_FUNC_{}", addr)?;
 
-            let blocks = function.basic_blocks();
-            for block in blocks {
-                writeln!(code_file, "            case {}:", block[0].addr)?;
-                for instruction in block {
-                    writeln!(code_file, "                /* {:>3X}/{} */ {};", instruction.opcode, instruction.addr, self.output_instruction_unsafe(instruction))?;
+            for block in &function.blocks {
+                writeln!(code_file, "            case {}:", block.label)?;
+                for instruction in &block.code {
+                    writeln!(code_file, "                /* {:>3X}/{} */ {};", instruction.opcode, instruction.addr, self.output_instruction_unsafe(&instruction))?;
                 }
             }
         }
@@ -150,16 +149,19 @@ void execute_loop(void) {{
             DoesNotBranch => condition,
             Branches(branch) => {
                 let action = self.output_branch_action(instruction, branch);
-                format!("if ({}) {{{}; break;}}", condition, action)
-            },
-            Jumps(branch) => {
                 match instruction.opcode {
-                    OP_JUMP => format!("{}; break", self.output_branch_action(instruction, branch)),
-                    OP_CATCH => format!("{}; {}; break", condition, self.output_branch_action(instruction, branch)),
-                    OP_JUMPABS => format!("pc = {}; break", self.output_operand_unsafe(*instruction.operands.last().unwrap())),
-                    _ => panic!(),
+                    OP_CATCH => format!("{}; {}; break", condition, action),
+                    _ => format!("if ({}) {{{}; break;}}", condition, action),
                 }
             },
+            Jumps(branch) => {
+                if instruction.opcode == OP_JUMP {
+                    format!("{}; break", self.output_branch_action(instruction, branch))
+                }
+                else {
+                    format!("pc = {}; break", self.output_operand_unsafe(*instruction.operands.last().unwrap()))
+                }
+            }
         }
     }
 

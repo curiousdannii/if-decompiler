@@ -14,6 +14,8 @@ use std::io::Cursor;
 use fnv::FnvHashMap;
 use petgraph::graph;
 
+use relooper;
+
 use super::*;
 
 mod disassembler;
@@ -56,46 +58,13 @@ impl VirtualMachine for GlulxState {
 
 pub struct Function {
     pub addr: u32,
-    pub argument_mode: FunctionArgumentMode,
-    pub entry_points: FnvHashSet<u32>,
-    pub exit_points: FnvHashSet<u32>,
+    pub blocks: Vec<GlulxBasicBlock>,
     pub graph_node: graph::NodeIndex,
-    pub instructions: Vec<Instruction>,
     pub locals: u32,
     pub safety: FunctionSafety,
 }
 
-// Calculate basic blocks
-impl<'a> Function {
-    pub fn basic_blocks(&'a self) -> Vec<&'a[Instruction]> {
-        let mut basic_blocks = Vec::default();
-        let mut start_index = 0;
-        let instructions_count = self.instructions.len();
-
-        for index in 0..instructions_count {
-            // Finish a previous block because this one starts a new one
-            if self.entry_points.contains(&self.instructions[index].addr) && index != start_index {
-                basic_blocks.push(&self.instructions[start_index..(index)]);
-                start_index = index;
-            }
-            // Make a basic block because this instruction exits
-            if self.exit_points.contains(&self.instructions[index].addr) {
-                basic_blocks.push(&self.instructions[start_index..(index + 1)]);
-                start_index = index + 1;
-            }
-        }
-        // Add a final block if needed
-        if start_index < instructions_count {
-            basic_blocks.push(&self.instructions[start_index..instructions_count]);
-        }
-        basic_blocks
-    }
-}
-
-pub enum FunctionArgumentMode {
-    Stack,
-    Locals,
-}
+type GlulxBasicBlock = relooper::BasicBlock<u32, Instruction>;
 
 pub struct Instruction {
     pub addr: u32,
@@ -115,30 +84,4 @@ pub enum Operand {
     Stack,
     Local(u32),
     RAM(u32),
-}
-
-#[derive(Copy, Clone, PartialEq)]
-pub enum StoreMode {
-    DoesNotStore,
-    LastOperand,
-    FirstOperand,
-    LastTwoOperands,
-}
-
-#[derive(Copy, Clone, PartialEq)]
-pub enum BranchMode {
-    DoesNotBranch,
-    Branches,
-    Jumps,
-}
-
-pub enum DecodingNode {
-    Branch(DecodingNodeBranch),
-    Leaf,
-    Terminator,
-}
-
-pub struct DecodingNodeBranch {
-    pub left: u32,
-    pub right: u32,
 }

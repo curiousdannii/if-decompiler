@@ -43,7 +43,7 @@ impl GlulxState {
 
                 // Functions
                 0xC0 | 0xC1 => {
-                    self.functions.insert(addr, self.disassemble_function(&mut cursor, &mut graph, addr, object_type));
+                    self.functions.insert(addr, self.disassemble_function(&mut cursor, &mut graph, addr));
                 },
 
                 // Strings - just skip past them for now!
@@ -173,13 +173,7 @@ impl GlulxState {
         table
     }
 
-    fn disassemble_function(&self, cursor: &mut Cursor<&Box<[u8]>>, graph: &mut DisassemblyGraph, addr: u32, function_mode: u8) -> Function {
-        let argument_mode = match function_mode {
-            0xC0 => FunctionArgumentMode::Stack,
-            0xC1 => FunctionArgumentMode::Locals,
-            _ => unreachable!(),
-        };
-
+    fn disassemble_function(&self, cursor: &mut Cursor<&Box<[u8]>>, graph: &mut DisassemblyGraph, addr: u32) -> Function {
         // Parse the locals formats
         let mut locals = 0;
         loop {
@@ -196,8 +190,7 @@ impl GlulxState {
 
         // Basic blocks
         let mut entry_points = FnvHashSet::default();
-        entry_points.insert(cursor.position() as u32);
-        let mut exit_points = FnvHashSet::default();
+        let mut exit_branches = FnvHashMap::default();
 
         // Parse the instructions
         let mut instructions = Vec::new();
@@ -210,26 +203,31 @@ impl GlulxState {
             use Branch::*;
             match instruction.branch {
                 DoesNotBranch => {},
-                Branches(target) | Jumps(target) => {
-                    exit_points.insert(instruction.addr);
-                    match target {
-                        BranchTarget::Absolute(addr) => {
-                            entry_points.insert(addr);
-                        },
-                        _ => {},
+                Branches(target) => {
+                    entry_points.insert(instruction.next);
+                    let mut branch_targets = vec![instruction.next];
+                    if let BranchTarget::Absolute(addr) = target {
+                        entry_points.insert(addr);
+                        branch_targets.push(addr);
                     }
+                    exit_branches.insert(instruction.addr, branch_targets);
                 },
+                Jumps(target) => {
+                    let mut branch_targets = Vec::new();
+                    if let BranchTarget::Absolute(addr) = target {
+                        entry_points.insert(addr);
+                        branch_targets.push(addr);
+                    }
+                    exit_branches.insert(instruction.addr, branch_targets);
+                }
             };
             let opcode = instruction.opcode;
 
             // If this instruction calls, then add it to the graph
             if opcodes::instruction_calls(opcode) {
-                match instruction.operands[0] {
-                    Operand::Constant(callee_addr) => {
-                        graph.edges.insert((addr, callee_addr));
-                    },
-                    _ => {},
-                };
+                if let Operand::Constant(callee_addr) = instruction.operands[0] {
+                    graph.edges.insert((addr, callee_addr));
+                }
             }
 
             instructions.push(instruction);
@@ -253,13 +251,59 @@ impl GlulxState {
             graph.unsafe_functions.push(addr);
         }
 
+        // Calculate basic blocks
+        let mut blocks: Vec<GlulxBasicBlock> = Vec::new();
+        let mut has_started_block = false;
+        let mut last_instruction_halted = false;
+        while !instructions.is_empty() {
+            let instruction = instructions.remove(0);
+            let addr = instruction.addr;
+            if has_started_block {
+                let current_block = blocks.last_mut().unwrap();
+                // Finish a previous block because this one starts a new one
+                if entry_points.contains(&addr) {
+                    // Unless the last instruction halted, add this new instruction as a branch to the last block
+                    if !last_instruction_halted {
+                        current_block.branches.insert(addr);
+                    }
+                    // Make a new block below
+                }
+                else {
+                    // If this instruction branches, finish up the block
+                    if let Some(branches) = exit_branches.get_mut(&addr) {
+                        for branch in branches {
+                            current_block.branches.insert(*branch);
+                        }
+                        has_started_block = false;
+                    }
+                    // Add to the current block
+                    last_instruction_halted = opcodes::instruction_halts(instruction.opcode);
+                    current_block.code.push(instruction);
+                    // Continue so we don't make a new block
+                    continue;
+                }
+            }
+            // Make a new block
+            has_started_block = true;
+            last_instruction_halted = opcodes::instruction_halts(instruction.opcode);
+            let mut current_block = GlulxBasicBlock {
+                label: addr,
+                code: vec![instruction],
+                branches: FnvHashSet::default(),
+            };
+            // Add branches if we have any
+            if let Some(branches) = exit_branches.get_mut(&addr) {
+                for branch in branches {
+                    current_block.branches.insert(*branch);
+                }
+            }
+            blocks.push(current_block);
+        }
+
         Function {
             addr,
-            argument_mode,
-            entry_points,
-            exit_points,
+            blocks,
             graph_node: graph.graph.add_node(addr),
-            instructions,
             locals,
             safety,
         }
@@ -328,6 +372,7 @@ impl GlulxState {
                 _ => Dynamic,
             }
         };
+        use opcodes::{BranchMode, StoreMode};
         let branch = match opcodes::instruction_branches(opcode) {
             BranchMode::DoesNotBranch => Branch::DoesNotBranch,
             BranchMode::Branches => Branch::Branches(calc_branch()),
@@ -353,4 +398,15 @@ impl GlulxState {
             next: cursor.position() as u32,
         }
     }
+}
+
+pub enum DecodingNode {
+    Branch(DecodingNodeBranch),
+    Leaf,
+    Terminator,
+}
+
+pub struct DecodingNodeBranch {
+    pub left: u32,
+    pub right: u32,
 }

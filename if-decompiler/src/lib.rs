@@ -9,6 +9,8 @@ https://github.com/curiousdannii/if-decompiler
 
 */
 
+#![forbid(unsafe_code)]
+
 use fnv::FnvHashSet;
 use petgraph::{graph, visit};
 

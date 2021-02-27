@@ -2,6 +2,7 @@
 members = [
     "glulxtoc",
     "if-decompiler",
+    "relooper",
 ]
 
 [profile.release]

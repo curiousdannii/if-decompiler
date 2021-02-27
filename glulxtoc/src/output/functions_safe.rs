@@ -66,8 +66,10 @@ impl GlulxOutput {
             writeln!(code_file, "{} {{
     glui32 arg, oldsp, oldvsb, res, temp0, temp1;
     valstackbase = stackptr;", function_spec)?;
-            for instruction in &function.instructions {
-                writeln!(code_file, "    /* {:>3X}/{} */ {};", instruction.opcode, instruction.addr, self.output_instruction_safe(instruction))?;
+            for block in &function.blocks {
+                for instruction in &block.code {
+                    writeln!(code_file, "    /* {:>3X}/{} */ {};", instruction.opcode, instruction.addr, self.output_instruction_safe(&instruction))?;
+                }
             }
             writeln!(code_file, "    return 0;
 }}

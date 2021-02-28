@@ -9,4 +9,5 @@ edition = "2018"
 [dependencies]
 fnv = "1.0.7"
 if-decompiler = {path = "../if-decompiler"}
+relooper = {path = "../relooper"}
 structopt = "0.3.13"

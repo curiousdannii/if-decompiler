@@ -16,6 +16,7 @@ use fnv::FnvHashMap;
 use if_decompiler::*;
 use glulx::*;
 use glulx::opcodes;
+use relooper::*;
 
 use super::*;
 
@@ -47,6 +48,9 @@ impl GlulxOutput {
             if function.safety == FunctionSafety::Unsafe {
                 continue;
             }
+
+            let relooper = Relooper::new(&function.blocks);
+            let block = relooper.reloop();
 
             // Add to the list of safe_funcs
             match safe_funcs.get_mut(&function.locals) {

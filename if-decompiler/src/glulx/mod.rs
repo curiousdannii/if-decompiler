@@ -14,8 +14,6 @@ use std::io::Cursor;
 use fnv::FnvHashMap;
 use petgraph::graph;
 
-use relooper;
-
 use super::*;
 
 mod disassembler;
@@ -64,7 +62,11 @@ pub struct Function {
     pub safety: FunctionSafety,
 }
 
-type GlulxBasicBlock = relooper::BasicBlock<u32, Instruction>;
+pub struct GlulxBasicBlock {
+    pub label: u32,
+    pub code: Vec<Instruction>,
+    pub branches: FnvHashSet<u32>,
+}
 
 pub struct Instruction {
     pub addr: u32,

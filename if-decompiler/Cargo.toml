@@ -10,4 +10,3 @@ edition = "2018"
 bytes = "1.0.1"
 fnv = "1.0.7"
 petgraph = "0.5.1"
-relooper = {path = "../relooper"}

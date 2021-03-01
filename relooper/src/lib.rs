@@ -14,23 +14,22 @@ https://github.com/emscripten-core/emscripten/blob/master/docs/paper.pdf
 
 #![forbid(unsafe_code)]
 
-use core::hash::Hash;
+use core::hash::{BuildHasher, Hash};
+use std::collections::HashMap;
 use std::fmt::Display;
 
-use fnv::{FnvHashMap, FnvHashSet};
+use fnv::FnvHashMap;
 use petgraph::{algo, graph, visit};
-use graph::Graph;
 
 // Common traits for labels
 pub trait RelooperLabel: Copy + Display + Eq + Hash {}
 impl<T> RelooperLabel for T
 where T: Copy + Display + Eq + Hash {}
 
-// Relooper accepts BasicBlocks as its input
-pub struct BasicBlock<L: RelooperLabel, C> {
-    pub label: L,
-    pub code: Vec<C>,
-    pub branches: FnvHashSet<L>,
+// The Relooper accepts a map of block labels to the labels each block can branch to
+pub fn reloop<L: RelooperLabel, S: BuildHasher>(blocks: HashMap<L, Vec<L>, S>, first_label: L) -> ShapedBlock<L> {
+    let relooper = Relooper::new(blocks);
+    relooper.reloop_reduce(vec![first_label])
 }
 
 // And returns a ShapedBlock tree
@@ -57,43 +56,34 @@ pub struct MultipleBlock<L: RelooperLabel> {
 }
 
 // The Relooper algorithm
-pub struct Relooper<'a, L: RelooperLabel, C> {
-    block_labels: FnvHashMap<L, usize>,
-    blocks: &'a Vec<BasicBlock<L, C>>,
-    graph: Graph<L, ()>,
+struct Relooper<L: RelooperLabel, S: BuildHasher> {
+    blocks: HashMap<L, Vec<L>, S>,
+    graph: graph::Graph<L, ()>,
     nodes: FnvHashMap<L, graph::NodeIndex>,
 }
 
-impl<'a, L: RelooperLabel, C> Relooper<'a, L, C> {
-    pub fn new(blocks: &'a Vec<BasicBlock<L, C>>) -> Relooper<L, C> {
-        // Start by building a graph of blocks
-        let mut graph: Graph<L, ()> = Graph::new();
-
-        // Build a map of nodes
-        let mut block_labels = FnvHashMap::default();
+impl<L: RelooperLabel, S: BuildHasher> Relooper<L, S> {
+    fn new(blocks: HashMap<L, Vec<L>, S>) -> Relooper<L, S> {
+        let mut graph = graph::Graph::new();
         let mut nodes = FnvHashMap::default();
-        for (i, block) in blocks.iter().enumerate() {
-            block_labels.insert(block.label, i);
-            nodes.insert(block.label, graph.add_node(block.label));
+
+        // Add nodes for each block
+        for label in blocks.keys() {
+            nodes.insert(*label, graph.add_node(*label));
         }
 
         // Add the edges
-        for block in blocks {
-            for branch in &block.branches {
-                graph.add_edge(nodes[&block.label], nodes[&branch], ());
+        for (label, branches) in &blocks {
+            for branch in branches {
+                graph.add_edge(nodes[&label], nodes[&branch], ());
             }
         }
 
         Relooper {
-            block_labels,
             blocks,
             graph,
             nodes,
         }
-    }
-
-    pub fn reloop(&self) -> ShapedBlock<L> {
-        self.reloop_reduce(vec![self.blocks[0].label])
     }
 
     fn reloop_reduce(&self, entries: Vec<L>) -> ShapedBlock<L> {
@@ -103,9 +93,8 @@ impl<'a, L: RelooperLabel, C> Relooper<'a, L, C> {
             let node = self.nodes[&label];
             if !is_node_in_cycle(&self.graph, node) {
                 println!("simple block {}", label);
-                let block = &self.blocks[self.block_labels[&label]];
                 let mut new_entries = Vec::new();
-                for branch in block.branches.iter() {
+                for branch in &self.blocks[&label] {
                     new_entries.push(*branch);
                 }
                 return ShapedBlock::Simple(SimpleBlock {

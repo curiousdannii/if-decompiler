@@ -49,9 +49,6 @@ impl GlulxOutput {
                 continue;
             }
 
-            let relooper = Relooper::new(&function.blocks);
-            let block = relooper.reloop();
-
             // Add to the list of safe_funcs
             match safe_funcs.get_mut(&function.locals) {
                 Some(vec) => {
@@ -70,11 +67,7 @@ impl GlulxOutput {
             writeln!(code_file, "{} {{
     glui32 arg, oldsp, oldvsb, res, temp0, temp1;
     valstackbase = stackptr;", function_spec)?;
-            for block in &function.blocks {
-                for instruction in &block.code {
-                    writeln!(code_file, "    /* {:>3X}/{} */ {};", instruction.opcode, instruction.addr, self.output_instruction_safe(&instruction))?;
-                }
-            }
+            code_file.write(self.output_function_body(function).as_bytes())?;
             writeln!(code_file, "    return 0;
 }}
 ")?;
@@ -123,6 +116,29 @@ impl GlulxOutput {
         let duration = start.elapsed();
         println!("Time outputting safe functions: {:?}", duration);
         Ok(())
+    }
+
+    // Output a function
+    fn output_function_body(&self, function: &Function) -> String {
+        // Prepare a map of block labels and branches
+        let mut input_blocks = FnvHashMap::default();
+        for block in &function.blocks {
+            let mut branches = Vec::new();
+            for branch in &block.branches {
+                branches.push(*branch);
+            }
+            input_blocks.insert(block.label, branches);
+        }
+
+        // Run the relooper
+        let block = reloop(input_blocks, function.blocks[0].label);
+
+        self.output_shaped_block(function, block)
+    }
+
+    // Output a shaped block
+    fn output_shaped_block(&self, function: &Function, block: ShapedBlock<u32>) -> String {
+        String::new()
     }
 
     // Output an instruction

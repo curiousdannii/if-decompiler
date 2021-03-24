@@ -426,15 +426,8 @@ void PushStack(glui32 storeval) {
     stackptr += 4;
 }
 
-glui32 ReadLocal(glui32 addr) {
-    addr += localsbase;
-    return Stk4(addr);
-}
-
-void StoreLocal(glui32 addr, glui32 value) {
-    addr += localsbase;
-    StkW4(addr, value);
-}
+#define ReadLocal(addr) (Stk4(addr + localsbase))
+#define StoreLocal(addr, value) (StkW4(addr + localsbase, value))
 
 int VM_BRANCH(glui32 offset, glui32 next) {
     if (offset == 0 || offset == 1)
@@ -482,15 +475,17 @@ int VM_JUMP_CALL(glui32 pc) {
 }
 
 void VM_TAILCALL_FUNCTION(glui32 addr, glui32 count) {
-    glui32 *arglist;
     if (!VM_FUNC_IS_SAFE(addr)) {
+        glui32 *arglist;
         arglist = pop_arguments(count, 0);
         leave_function();
         enter_function(addr, count, arglist);
     }
-    glui32 result = VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(addr, count);
-    leave_function();
-    if (stackptr != 0) {
-        pop_callstub(result);
+    else {
+        glui32 result = VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(addr, count);
+        leave_function();
+        if (stackptr != 0) {
+            pop_callstub(result);
+        }
     }
 }

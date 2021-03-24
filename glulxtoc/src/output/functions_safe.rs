@@ -137,7 +137,7 @@ impl GlulxOutput {
     }
 
     // Output a shaped block
-    fn output_shaped_block(&self, function: &Function, block: ShapedBlock<u32>) -> String {
+    fn output_shaped_block(&self, function: &Function, block: Box<ShapedBlock<u32>>) -> String {
         String::new()
     }
 

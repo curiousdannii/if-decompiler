@@ -23,6 +23,9 @@ use petgraph::prelude::*;
 use petgraph::{algo, graph};
 use petgraph::visit::{EdgeFiltered, IntoNeighbors};
 
+#[cfg(test)]
+mod tests;
+
 // Common traits for labels
 pub trait RelooperLabel: Copy + Display + Eq + Hash {}
 impl<T> RelooperLabel for T
@@ -35,30 +38,34 @@ pub fn reloop<L: RelooperLabel, S: BuildHasher>(blocks: HashMap<L, Vec<L>, S>, f
 }
 
 // And returns a ShapedBlock tree
+#[derive(Debug, PartialEq)]
 pub enum ShapedBlock<L: RelooperLabel> {
     Simple(SimpleBlock<L>),
     Loop(LoopBlock<L>),
     Multiple(MultipleBlock<L>),
 }
 
+#[derive(Debug, PartialEq)]
 pub struct SimpleBlock<L: RelooperLabel> {
     pub label: L,
     pub next: Option<Box<ShapedBlock<L>>>,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct LoopBlock<L: RelooperLabel> {
     pub loop_id: u16,
     pub inner: Box<ShapedBlock<L>>,
     pub next: Option<Box<ShapedBlock<L>>>,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct MultipleBlock<L: RelooperLabel> {
     pub label: L,
     pub next: Option<Box<ShapedBlock<L>>>,
 }
 
 // Branch modes
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BranchMode {
     Basic,
     LoopBreak(u16),

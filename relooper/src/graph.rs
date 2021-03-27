@@ -51,7 +51,8 @@ where
     {
         // If we have a previous node, add its filtered neighbours to the stack
         if let Some(last_node) = self.last_node {
-            while let Some((edge, target)) = graph.neighbors(last_node).detach().next(&graph) {
+            let mut edges = graph.neighbors(last_node).detach();
+            while let Some((edge, target)) = edges.next(&graph) {
                 if !(self.filter_fn)(graph[edge]) {
                     continue;
                 }

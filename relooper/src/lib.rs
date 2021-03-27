@@ -16,7 +16,7 @@ https://github.com/emscripten-core/emscripten/blob/master/docs/paper.pdf
 
 use core::hash::{BuildHasher, Hash};
 use std::collections::HashMap;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use fnv::FnvHashMap;
 use petgraph::prelude::*;
@@ -30,9 +30,9 @@ use graph::FilteredDfs;
 mod tests;
 
 // Common traits for labels
-pub trait RelooperLabel: Copy + Display + Eq + Hash {}
+pub trait RelooperLabel: Copy + Debug + Display + Eq + Hash {}
 impl<T> RelooperLabel for T
-where T: Copy + Display + Eq + Hash {}
+where T: Copy + Debug + Display + Eq + Hash {}
 
 // The Relooper accepts a map of block labels to the labels each block can branch to
 pub fn reloop<L: RelooperLabel, S: BuildHasher>(blocks: HashMap<L, Vec<L>, S>, first_label: L) -> Box<ShapedBlock<L>> {
@@ -83,15 +83,16 @@ fn filter_branch_modes(edge: petgraph::graph::EdgeReference<BranchMode>) -> bool
 }
 
 // The Relooper algorithm
-struct Relooper<L: RelooperLabel, S: BuildHasher> {
-    blocks: HashMap<L, Vec<L>, S>,
+struct Relooper<L: RelooperLabel> {
     counter: u16,
     graph: Graph<L, BranchMode>,
     nodes: FnvHashMap<L, NodeIndex>,
 }
 
-impl<L: RelooperLabel, S: BuildHasher> Relooper<L, S> {
-    fn new(blocks: HashMap<L, Vec<L>, S>) -> Relooper<L, S> {
+impl<L: RelooperLabel> Relooper<L> {
+    fn new<S>(blocks: HashMap<L, Vec<L>, S>) -> Relooper<L>
+    where S: BuildHasher
+    {
         let mut graph = Graph::new();
         let mut nodes = FnvHashMap::default();
 
@@ -108,7 +109,6 @@ impl<L: RelooperLabel, S: BuildHasher> Relooper<L, S> {
         }
 
         Relooper {
-            blocks,
             counter: 0,
             graph,
             nodes,
@@ -116,11 +116,20 @@ impl<L: RelooperLabel, S: BuildHasher> Relooper<L, S> {
     }
 
     fn reloop_reduce(&mut self, entries: Vec<L>) -> Option<Box<ShapedBlock<L>>> {
+        if entries.len() == 0 {
+            return None
+        }
+
         // If we have a single entry, and cannot return to it, create a simple block
         if entries.len() == 1 {
             let label = entries[0];
-            if !self.is_node_in_cycle(self.nodes[&label]) {
-                let new_entries = self.blocks[&label].clone();
+            let node = self.nodes[&label];
+            if !self.is_node_in_cycle(node) {
+                let mut new_entries = Vec::default();
+                let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_branch_modes);
+                for neighbour in filtered_graph.neighbors(node) {
+                    new_entries.push(self.graph[neighbour]);
+                }
                 return Some(Box::new(ShapedBlock::Simple(SimpleBlock {
                     label,
                     next: self.reloop_reduce(new_entries),
@@ -140,7 +149,10 @@ impl<L: RelooperLabel, S: BuildHasher> Relooper<L, S> {
             })))
         }
 
-        None
+        return None;
+        // Multi
+
+        unreachable!();
     }
 
     fn is_node_in_cycle(&self, node: NodeIndex) -> bool {
@@ -178,7 +190,9 @@ impl<L: RelooperLabel, S: BuildHasher> Relooper<L, S> {
         // Go through the graph, changing edges if they are branches back to an entry or if they exit the loop
         let mut next_entries = Vec::default();
         while let Some(node) = dfs.next(&self.graph) {
-            'edges_loop: while let Some((edge, target)) = self.graph.neighbors(node).detach().next(&self.graph) {
+            let mut edges = self.graph.neighbors(node).detach();
+            'edges_loop: while let Some((edge, target)) = edges.next(&self.graph) {
+                // Filter out branches that have already been transformed
                 if self.graph[edge] != Basic {
                     continue 'edges_loop;
                 }

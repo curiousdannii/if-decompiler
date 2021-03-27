@@ -20,8 +20,11 @@ use std::fmt::Display;
 
 use fnv::FnvHashMap;
 use petgraph::prelude::*;
-use petgraph::{algo, graph};
+use petgraph::algo;
 use petgraph::visit::{EdgeFiltered, IntoNeighbors};
+
+mod graph;
+use graph::FilteredDfs;
 
 #[cfg(test)]
 mod tests;
@@ -72,7 +75,7 @@ pub enum BranchMode {
     LoopContinue(u16),
 }
 
-fn filter_branch_modes(edge: graph::EdgeReference<BranchMode>) -> bool {
+fn filter_branch_modes(edge: petgraph::graph::EdgeReference<BranchMode>) -> bool {
     match edge.weight() {
         BranchMode::Basic => true,
         _ => false,
@@ -116,18 +119,25 @@ impl<L: RelooperLabel, S: BuildHasher> Relooper<L, S> {
         // If we have a single entry, and cannot return to it, create a simple block
         if entries.len() == 1 {
             let label = entries[0];
-            let node = self.nodes[&label];
-            if !self.is_node_in_cycle(node) {
-                println!("simple block {}", label);
-                let mut new_entries = Vec::new();
-                for branch in &self.blocks[&label] {
-                    new_entries.push(*branch);
-                }
+            if !self.is_node_in_cycle(self.nodes[&label]) {
+                let new_entries = self.blocks[&label].clone();
                 return Some(Box::new(ShapedBlock::Simple(SimpleBlock {
                     label,
                     next: self.reloop_reduce(new_entries),
                 })))
             }
+        }
+
+        // If we can return to all of the entries, create a loop block
+        if self.do_all_entries_loop(&entries) {
+            let loop_id = self.counter;
+            self.counter += 1;
+            let next_entries = self.make_loop(&entries, loop_id);
+            return Some(Box::new(ShapedBlock::Loop(LoopBlock {
+                loop_id,
+                inner: self.reloop_reduce(entries).unwrap(),
+                next: self.reloop_reduce(next_entries),
+            })))
         }
 
         None
@@ -142,5 +152,53 @@ impl<L: RelooperLabel, S: BuildHasher> Relooper<L, S> {
             }
         }
         false
+    }
+
+    fn do_all_entries_loop(&self, entries: &Vec<L>) -> bool {
+        let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_branch_modes);
+        let mut space = algo::DfsSpace::new(&filtered_graph);
+        'entry_loop: for entry in entries {
+            let entry_node = self.nodes[&entry];
+            // Each entry must have one branch that loops back
+            for neighbour in filtered_graph.neighbors(entry_node) {
+                if algo::has_path_connecting(&filtered_graph, neighbour, entry_node, Some(&mut space)) {
+                    continue 'entry_loop;
+                }
+            }
+            return false;
+        }
+        true
+    }
+
+    fn make_loop(&mut self, entries: &Vec<L>, loop_id: u16) -> Vec<L> {
+        use BranchMode::*;
+        let mut space = algo::DfsSpace::new(&self.graph);
+        let mut dfs = FilteredDfs::empty(&self.graph, |weight| weight == Basic);
+        dfs.stack = entries.iter().map(|addr| self.nodes[addr]).collect();
+        // Go through the graph, changing edges if they are branches back to an entry or if they exit the loop
+        let mut next_entries = Vec::default();
+        while let Some(node) = dfs.next(&self.graph) {
+            'edges_loop: while let Some((edge, target)) = self.graph.neighbors(node).detach().next(&self.graph) {
+                if self.graph[edge] != Basic {
+                    continue 'edges_loop;
+                }
+                let target_addr = self.graph[target];
+                // Branching back to an entry -> convert to a continue
+                if entries.contains(&target_addr) {
+                    self.graph[edge] = LoopContinue(loop_id);
+                }
+                // If the branch can't return to any entry, convert it to a break
+                else {
+                    for entry in entries {
+                        if algo::has_path_connecting(&self.graph, target, self.nodes[&entry], Some(&mut space)) {
+                            continue 'edges_loop;
+                        }
+                    }
+                    self.graph[edge] = LoopBreak(loop_id);
+                    next_entries.push(target_addr);
+                }
+            }
+        }
+        next_entries
     }
 }

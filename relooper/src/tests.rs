@@ -7,15 +7,13 @@ Copyright (c) 2021 Dannii Willis
 MIT licenced
 https://github.com/curiousdannii/if-decompiler
 
-Based on the Relooper algorithm paper by Alon Zakai
-https://github.com/emscripten-core/emscripten/blob/master/docs/paper.pdf
-
 */
 
 use fnv::FnvHashMap;
 
 use super::*;
 
+// Basic sequential blocks
 #[test]
 fn test_basic_blocks() {
     let mut blocks: FnvHashMap<u32, Vec<u32>> = FnvHashMap::default();

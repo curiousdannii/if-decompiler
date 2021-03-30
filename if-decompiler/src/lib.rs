@@ -11,7 +11,7 @@ https://github.com/curiousdannii/if-decompiler
 
 #![forbid(unsafe_code)]
 
-use fnv::FnvHashSet;
+use fnv::{FnvHashMap, FnvHashSet};
 use petgraph::{graph, visit};
 
 pub mod glulx;
@@ -54,6 +54,71 @@ pub trait VirtualMachine {
             self.mark_function_as_unsafe(addr);
         }
     }
+}
+
+// Generic instruction functions
+pub trait VMInstruction {
+    fn addr(&self) -> u32;
+    fn does_halt(&self) -> bool;
+}
+
+// A generic basic block
+pub struct BasicBlock<I> {
+    pub label: u32,
+    pub code: Vec<I>,
+    pub branches: FnvHashSet<u32>,
+}
+
+// Calculate basic blocks
+// If we need to return a map, use BTreeMap so it can remain sorted
+pub fn calculate_basic_blocks<I: VMInstruction>(instructions: Vec<I>, entry_points: FnvHashSet<u32>, exit_branches: FnvHashMap<u32, Vec<u32>>) -> Vec<BasicBlock<I>> {
+    let mut blocks: Vec<BasicBlock<I>> = Vec::new();
+    let mut has_started_block = false;
+    let mut last_instruction_halted = false;
+    for instruction in instructions {
+        let addr = instruction.addr();
+        if has_started_block {
+            let current_block = blocks.last_mut().unwrap();
+            // Finish a previous block because this one starts a new one
+            if entry_points.contains(&addr) {
+                // Unless the last instruction halted, add this new instruction as a branch to the last block
+                if !last_instruction_halted {
+                    current_block.branches.insert(addr);
+                }
+                // Make a new block below
+            }
+            else {
+                // If this instruction branches, finish up the block
+                if let Some(branches) = exit_branches.get(&addr) {
+                    for branch in branches {
+                        current_block.branches.insert(*branch);
+                    }
+                    has_started_block = false;
+                }
+                // Add to the current block
+                last_instruction_halted = instruction.does_halt();
+                current_block.code.push(instruction);
+                // Continue so we don't make a new block
+                continue;
+            }
+        }
+        // Make a new block
+        has_started_block = true;
+        last_instruction_halted = instruction.does_halt();
+        let mut current_block = BasicBlock::<I> {
+            label: addr,
+            code: vec![instruction],
+            branches: FnvHashSet::default(),
+        };
+        // Add branches if we have any
+        if let Some(branches) = exit_branches.get(&addr) {
+            for branch in branches {
+                current_block.branches.insert(*branch);
+            }
+        }
+        blocks.push(current_block);
+    }
+    blocks
 }
 
 #[derive(Copy, Clone, PartialEq)]

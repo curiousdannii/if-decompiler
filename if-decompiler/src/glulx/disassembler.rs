@@ -204,13 +204,21 @@ impl GlulxState {
             match instruction.branch {
                 DoesNotBranch => {},
                 Branches(target) => {
-                    entry_points.insert(instruction.next);
-                    let mut branch_targets = vec![instruction.next];
-                    if let BranchTarget::Absolute(addr) = target {
-                        entry_points.insert(addr);
-                        branch_targets.push(addr);
+                    // If the branch returns then don't end a basic block here
+                    // Except for @catch!
+                    let returns = match target {
+                        BranchTarget::Return(_) => true,
+                        _ => false,
+                    };
+                    if !returns || instruction.opcode == opcodes::OP_CATCH {
+                        entry_points.insert(instruction.next);
+                        let mut branch_targets = vec![instruction.next];
+                        if let BranchTarget::Absolute(addr) = target {
+                            entry_points.insert(addr);
+                            branch_targets.push(addr);
+                        }
+                        exit_branches.insert(instruction.addr, branch_targets);
                     }
-                    exit_branches.insert(instruction.addr, branch_targets);
                 },
                 Jumps(target) => {
                     let mut branch_targets = Vec::new();
@@ -251,54 +259,7 @@ impl GlulxState {
             graph.unsafe_functions.push(addr);
         }
 
-        // Calculate basic blocks
-        let mut blocks: Vec<GlulxBasicBlock> = Vec::new();
-        let mut has_started_block = false;
-        let mut last_instruction_halted = false;
-        while !instructions.is_empty() {
-            let instruction = instructions.remove(0);
-            let addr = instruction.addr;
-            if has_started_block {
-                let current_block = blocks.last_mut().unwrap();
-                // Finish a previous block because this one starts a new one
-                if entry_points.contains(&addr) {
-                    // Unless the last instruction halted, add this new instruction as a branch to the last block
-                    if !last_instruction_halted {
-                        current_block.branches.insert(addr);
-                    }
-                    // Make a new block below
-                }
-                else {
-                    // If this instruction branches, finish up the block
-                    if let Some(branches) = exit_branches.get_mut(&addr) {
-                        for branch in branches {
-                            current_block.branches.insert(*branch);
-                        }
-                        has_started_block = false;
-                    }
-                    // Add to the current block
-                    last_instruction_halted = opcodes::instruction_halts(instruction.opcode);
-                    current_block.code.push(instruction);
-                    // Continue so we don't make a new block
-                    continue;
-                }
-            }
-            // Make a new block
-            has_started_block = true;
-            last_instruction_halted = opcodes::instruction_halts(instruction.opcode);
-            let mut current_block = GlulxBasicBlock {
-                label: addr,
-                code: vec![instruction],
-                branches: FnvHashSet::default(),
-            };
-            // Add branches if we have any
-            if let Some(branches) = exit_branches.get_mut(&addr) {
-                for branch in branches {
-                    current_block.branches.insert(*branch);
-                }
-            }
-            blocks.push(current_block);
-        }
+        let blocks = calculate_basic_blocks(instructions, entry_points, exit_branches);
 
         Function {
             addr,

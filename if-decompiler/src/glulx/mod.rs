@@ -62,11 +62,7 @@ pub struct Function {
     pub safety: FunctionSafety,
 }
 
-pub struct GlulxBasicBlock {
-    pub label: u32,
-    pub code: Vec<Instruction>,
-    pub branches: FnvHashSet<u32>,
-}
+type GlulxBasicBlock = BasicBlock<Instruction>;
 
 pub struct Instruction {
     pub addr: u32,
@@ -77,6 +73,16 @@ pub struct Instruction {
     pub storer: Operand,
     pub storer2: Operand,
     pub next: u32,
+}
+
+impl VMInstruction for Instruction {
+    fn addr(&self) -> u32 {
+        self.addr
+    }
+
+    fn does_halt(&self) -> bool {
+        opcodes::instruction_halts(self.opcode)
+    }
 }
 
 #[derive(Copy, Clone)]

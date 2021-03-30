@@ -426,9 +426,6 @@ void PushStack(glui32 storeval) {
     stackptr += 4;
 }
 
-#define ReadLocal(addr) (Stk4(addr + localsbase))
-#define StoreLocal(addr, value) (StkW4(addr + localsbase, value))
-
 int VM_BRANCH(glui32 offset, glui32 next) {
     if (offset == 0 || offset == 1)
     {

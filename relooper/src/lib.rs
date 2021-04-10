@@ -19,6 +19,7 @@ https://medium.com/leaningtech/solving-the-structured-control-flow-problem-once-
 
 use core::hash::{BuildHasher, Hash};
 use std::collections::HashMap;
+use std::iter::FromIterator;
 use std::fmt::{Debug, Display};
 
 use fnv::{FnvHashMap, FnvHashSet};
@@ -38,10 +39,10 @@ impl<T> RelooperLabel for T
 where T: Copy + Debug + Display + Eq + Hash {}
 
 // The Relooper accepts a map of block labels to the labels each block can branch to
-pub fn reloop<L: RelooperLabel, S: BuildHasher>(blocks: HashMap<L, Vec<L>, S>, first_label: L) {
+pub fn reloop<L: RelooperLabel, S: BuildHasher>(blocks: HashMap<L, Vec<L>, S>, first_label: L) -> Box<ShapedBlock<L>> {
     let mut relooper = Relooper::new(blocks, first_label);
     relooper.process_loops();
-    //relooper.reloop_reduce(vec![first_label]).unwrap()
+    relooper.output().unwrap()
 }
 
 // And returns a ShapedBlock tree
@@ -67,7 +68,7 @@ pub struct LoopBlock<L: RelooperLabel> {
 
 #[derive(Debug, PartialEq)]
 pub struct MultipleBlock<L: RelooperLabel> {
-    pub label: L,
+    pub handled: FnvHashMap<L, Box<ShapedBlock<L>>>,
     pub next: Option<Box<ShapedBlock<L>>>,
 }
 
@@ -83,16 +84,16 @@ pub enum BranchMode {
 type LoopId = u16;
 
 #[derive(Debug)]
-struct LoopData<L> {
+struct LoopData {
     id: LoopId,
-    next: FnvHashSet<L>,
+    next: FnvHashSet<NodeIndex>,
 }
 
 #[derive(Debug)]
 enum Node<L> {
     Basic(L),
-    Loop(LoopData<L>),
-    LoopMulti(LoopData<L>),
+    Loop(LoopData),
+    LoopMulti(LoopData),
 }
 
 #[derive(Debug)]
@@ -167,7 +168,6 @@ impl<L: RelooperLabel> Relooper<L> {
                     continue;
                 }
                 found_scc = true;
-                println!("{:?}", scc);
 
                 // Determine whether this is a multi-loop or not
                 // Get all incoming edges and find the loop headers
@@ -190,7 +190,7 @@ impl<L: RelooperLabel> Relooper<L> {
                     id: loop_id,
                     next: FnvHashSet::default(),
                 };
-                let loop_node = self.graph.add_node(if multi_loop { Node::Loop(loop_data) } else { Node::LoopMulti(loop_data) });
+                let loop_node = self.graph.add_node(if multi_loop { Node::LoopMulti(loop_data) } else { Node::Loop(loop_data) });
 
                 // Replace the incoming edges
                 for edge in edges {
@@ -227,15 +227,11 @@ impl<L: RelooperLabel> Relooper<L> {
                             if let Some(dominator) = dominators.immediate_dominator(target) {
                                 if dominator != node {
                                     self.graph[edge] = Edge::LoopBreak(loop_id);
-                                    let target_label = match self.graph[target] {
-                                        Node::Basic(label) => label,
-                                        _ => panic!("Cannot replace an edge to a loop node"),
-                                    };
                                     let loop_data = &mut self.graph[loop_node];
                                     match loop_data {
                                         Node::Basic(_) => unreachable!(),
                                         Node::Loop(data) | Node::LoopMulti(data) => {
-                                            data.next.insert(target_label);
+                                            data.next.insert(target);
                                         },
                                     };
                                 }
@@ -254,29 +250,61 @@ impl<L: RelooperLabel> Relooper<L> {
         assert!(!algo::is_cyclic_directed(&filtered_graph), "Graph should not contain any cycles");
     }
 
-    // Implement the Relooper algorithm found on pages 9-10 of the Relooper paper
-    /*fn reloop_reduce(&mut self, entries: Vec<L>) -> Option<Box<ShapedBlock<L>>> {
+    fn output(&self) -> Option<Box<ShapedBlock<L>>> {
+        self.reduce(vec![self.nodes[&self.root]])
+    }
+
+    fn reduce(&self, entries: Vec<NodeIndex>) -> Option<Box<ShapedBlock<L>>> {
         if entries.len() == 0 {
             return None
         }
 
-        // If we have a single entry, and cannot return to it, create a simple block
+        let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
+
+        // If we have one entry, then return the appropriate block
         if entries.len() == 1 {
-            let label = entries[0];
-            let node = self.nodes[&label];
-            if !self.is_node_in_cycle(node) {
-                let mut new_entries = Vec::default();
-                let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_branch_modes);
-                for neighbour in filtered_graph.neighbors(node) {
-                    new_entries.push(self.graph[neighbour]);
-                }
-                return Some(Box::new(ShapedBlock::Simple(SimpleBlock {
-                    label,
-                    next: self.reloop_reduce(new_entries),
-                })))
+            let node_id = entries[0];
+            let node = &self.graph[node_id];
+            return match node {
+                Node::Basic(label) => {
+                    let next_entries = Vec::from_iter(filtered_graph.neighbors(node_id));
+                    return Some(Box::new(ShapedBlock::Simple(SimpleBlock {
+                        label: *label,
+                        next: self.reduce(next_entries),
+                    })))
+                },
+                Node::Loop(data) => {
+                    let inner_entries = Vec::from_iter(filtered_graph.neighbors(node_id));
+                    let mut next_entries = Vec::new();
+                    for entry in &data.next {
+                        next_entries.push(*entry);
+                    }
+                    return Some(Box::new(ShapedBlock::Loop(LoopBlock {
+                        loop_id: data.id,
+                        inner: self.reduce(inner_entries).unwrap(),
+                        next: self.reduce(next_entries),
+                    })))
+                },
+                _ => { None },
             }
         }
 
+        // Handle multiple entries
+        let mut handled = FnvHashMap::default();
+        for entry in entries {
+            let node = &self.graph[entry];
+            let label = match node {
+                Node::Basic(label) => *label,
+                _ => panic!("Non-basic nodes in multiple"),
+            };
+            handled.insert(label, self.reduce(vec![entry]).unwrap());
+        }
+        Some(Box::new(ShapedBlock::Multiple(MultipleBlock {
+            handled,
+            next: None,
+        })))
+
+        /*
         // If we can return to all of the entries, create a loop block
         if self.do_all_entries_loop(&entries) {
             let loop_id = self.counter;
@@ -306,8 +334,8 @@ impl<L: RelooperLabel> Relooper<L> {
             loop_id,
             inner: self.reloop_reduce(entries).unwrap(),
             next: self.reloop_reduce(next_entries),
-        })))*/
-    }*/
+        })))*/*/
+    }
 
     /*fn is_node_in_cycle(&self, node: NodeIndex) -> bool {
         let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_branch_modes);

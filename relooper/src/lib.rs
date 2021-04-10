@@ -7,7 +7,7 @@ Copyright (c) 2021 Dannii Willis
 MIT licenced
 https://github.com/curiousdannii/if-decompiler
 
-Based on the Relooper algorithm paper by Alon Zakai
+Inspired by the Relooper algorithm paper by Alon Zakai
 https://github.com/emscripten-core/emscripten/blob/master/docs/paper.pdf
 
 And this article about the Cheerp Stackifier algorithm
@@ -27,8 +27,8 @@ use petgraph::prelude::*;
 use petgraph::algo;
 use petgraph::visit::{EdgeFiltered, IntoNeighbors};
 
-mod graph;
-use graph::*;
+//mod graph;
+//use graph::*;
 
 #[cfg(test)]
 mod tests;
@@ -117,6 +117,7 @@ fn filter_edges<L>(edge: petgraph::graph::EdgeReference<Edge<L>>) -> bool {
 // The Relooper algorithm
 struct Relooper<L: RelooperLabel> {
     counter: u16,
+    dominators: algo::dominators::Dominators<NodeIndex>,
     graph: Graph<Node<L>, Edge<L>>,
     nodes: FnvHashMap<L, NodeIndex>,
     root: L,
@@ -143,6 +144,7 @@ impl<L: RelooperLabel> Relooper<L> {
 
         Relooper {
             counter: 0,
+            dominators: algo::dominators::simple_fast(&graph, nodes[&root]),
             graph,
             nodes,
             root,
@@ -158,8 +160,8 @@ impl<L: RelooperLabel> Relooper<L> {
             // Filter the graph to ignore processed back edges
             let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
 
-            // Calculate dominators for determining loop breaks later on
-            let dominators = algo::dominators::simple_fast(&filtered_graph, self.nodes[&self.root]);
+            // Re-calculate dominators for determining loop breaks, etc
+            self.dominators = algo::dominators::simple_fast(&filtered_graph, self.nodes[&self.root]);
 
             // Run the SCC algorithm
             let sccs = algo::kosaraju_scc(&filtered_graph);
@@ -224,7 +226,7 @@ impl<L: RelooperLabel> Relooper<L> {
                         // Otherwise if branching outside the SCC, convert to a Break if not dominated
                         // But this won't detect non-dominated descendent nodes?
                         else if !scc.contains(&target) {
-                            if let Some(dominator) = dominators.immediate_dominator(target) {
+                            if let Some(dominator) = self.dominators.immediate_dominator(target) {
                                 if dominator != node {
                                     self.graph[edge] = Edge::LoopBreak(loop_id);
                                     let loop_data = &mut self.graph[loop_node];
@@ -255,8 +257,14 @@ impl<L: RelooperLabel> Relooper<L> {
     }
 
     fn reduce(&self, entries: Vec<NodeIndex>) -> Option<Box<ShapedBlock<L>>> {
+        let result = self.reduce_with_next(entries);
+        assert!(result.1.is_none(), "No dangling next entries");
+        result.0
+    }
+
+    fn reduce_with_next(&self, entries: Vec<NodeIndex>) -> (Option<Box<ShapedBlock<L>>>, Option<NodeIndex>) {
         if entries.len() == 0 {
-            return None
+            return (None, None)
         }
 
         let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
@@ -267,11 +275,20 @@ impl<L: RelooperLabel> Relooper<L> {
             let node = &self.graph[node_id];
             return match node {
                 Node::Basic(label) => {
+                    let mut next = None;
                     let next_entries = Vec::from_iter(filtered_graph.neighbors(node_id));
-                    return Some(Box::new(ShapedBlock::Simple(SimpleBlock {
+                    if next_entries.len() == 1 {
+                        let next_node = next_entries[0];
+                        if let Some(dominator) = self.dominators.immediate_dominator(next_node) {
+                            if dominator != node_id {
+                                next = Some(next_node);
+                            }
+                        }
+                    }
+                    return (Some(Box::new(ShapedBlock::Simple(SimpleBlock {
                         label: *label,
-                        next: self.reduce(next_entries),
-                    })))
+                        next: if next.is_none() { self.reduce(next_entries) } else { None },
+                    }))), next)
                 },
                 Node::Loop(data) => {
                     let inner_entries = Vec::from_iter(filtered_graph.neighbors(node_id));
@@ -279,140 +296,36 @@ impl<L: RelooperLabel> Relooper<L> {
                     for entry in &data.next {
                         next_entries.push(*entry);
                     }
-                    return Some(Box::new(ShapedBlock::Loop(LoopBlock {
+                    return (Some(Box::new(ShapedBlock::Loop(LoopBlock {
                         loop_id: data.id,
                         inner: self.reduce(inner_entries).unwrap(),
                         next: self.reduce(next_entries),
-                    })))
+                    }))), None)
                 },
-                _ => { None },
+                _ => { (None, None) },
             }
         }
 
         // Handle multiple entries
         let mut handled = FnvHashMap::default();
+        let mut next_entries = FnvHashSet::default();
         for entry in entries {
             let node = &self.graph[entry];
             let label = match node {
                 Node::Basic(label) => *label,
                 _ => panic!("Non-basic nodes in multiple"),
             };
-            handled.insert(label, self.reduce(vec![entry]).unwrap());
+            let result = self.reduce_with_next(vec![entry]);
+            if let Some(handled_node) = result.0 {
+                handled.insert(label, handled_node);
+            }
+            if let Some(next) = result.1 {
+                next_entries.insert(next);
+            }
         }
-        Some(Box::new(ShapedBlock::Multiple(MultipleBlock {
+        (Some(Box::new(ShapedBlock::Multiple(MultipleBlock {
             handled,
-            next: None,
-        })))
-
-        /*
-        // If we can return to all of the entries, create a loop block
-        if self.do_all_entries_loop(&entries) {
-            let loop_id = self.counter;
-            self.counter += 1;
-            let next_entries = self.make_loop(&entries, loop_id);
-            return Some(Box::new(ShapedBlock::Loop(LoopBlock {
-                loop_id,
-                inner: self.reloop_reduce(entries).unwrap(),
-                next: self.reloop_reduce(next_entries),
-            })))
-        }
-
-        // If we have more than one entry, try to create a multiple block
-        None
-        /*if entries.len() > 1 {
-            let (multiple_entries, next_entries) = self.make_multiple(&entries);
-            if multiple_entries.len() > 0 {
-
-            }
-        }
-
-        // If we couldn't make a multiple block, make a loop block
-        let loop_id = self.counter;
-        self.counter += 1;
-        let next_entries = self.make_loop(&entries, loop_id);
-        return Some(Box::new(ShapedBlock::Loop(LoopBlock {
-            loop_id,
-            inner: self.reloop_reduce(entries).unwrap(),
-            next: self.reloop_reduce(next_entries),
-        })))*/*/
+            next: self.reduce(Vec::from_iter(next_entries)),
+        }))), None)
     }
-
-    /*fn is_node_in_cycle(&self, node: NodeIndex) -> bool {
-        let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_branch_modes);
-        let mut space = algo::DfsSpace::new(&filtered_graph);
-        for neighbour in filtered_graph.neighbors(node) {
-            if algo::has_path_connecting(&filtered_graph, neighbour, node, Some(&mut space)) {
-                return true
-            }
-        }
-        false
-    }
-
-    fn do_all_entries_loop(&self, entries: &Vec<L>) -> bool {
-        let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_branch_modes);
-        let mut space = algo::DfsSpace::new(&filtered_graph);
-        'entry_loop: for entry in entries {
-            let entry_node = self.nodes[&entry];
-            // Each entry must have one branch that loops back
-            for neighbour in filtered_graph.neighbors(entry_node) {
-                if algo::has_path_connecting(&filtered_graph, neighbour, entry_node, Some(&mut space)) {
-                    continue 'entry_loop;
-                }
-            }
-            return false;
-        }
-        true
-    }
-
-    fn make_loop(&mut self, entries: &Vec<L>, loop_id: u16) -> Vec<L> {
-        use BranchMode::*;
-        let mut space = algo::DfsSpace::new(&self.graph);
-        let mut dfs = FilteredDfs::empty(&self.graph, |weight| weight == Basic);
-        dfs.stack = entries.iter().map(|addr| self.nodes[addr]).collect();
-        // Go through the graph, changing edges if they are branches back to an entry or if they exit the loop
-        let mut next_entries = Vec::default();
-        while let Some(node) = dfs.next(&self.graph) {
-            let mut edges = self.graph.neighbors(node).detach();
-            'edges_loop: while let Some((edge, target)) = edges.next(&self.graph) {
-                // Filter out branches that have already been transformed
-                if self.graph[edge] != Basic {
-                    continue 'edges_loop;
-                }
-                let target_addr = self.graph[target];
-                // Branching back to an entry -> convert to a continue
-                if entries.contains(&target_addr) {
-                    self.graph[edge] = LoopContinue(loop_id);
-                }
-                // If the branch can't return to any entry, convert it to a break
-                else {
-                    for entry in entries {
-                        if algo::has_path_connecting(&self.graph, target, self.nodes[&entry], Some(&mut space)) {
-                            continue 'edges_loop;
-                        }
-                    }
-                    self.graph[edge] = LoopBreak(loop_id);
-                    next_entries.push(target_addr);
-                }
-            }
-        }
-        next_entries
-    }
-
-    // Try to make a multiple block, but finding which entries have labels that can't be reached by any other entry
-    fn make_multiple(&mut self, entries: &Vec<L>) -> (Vec<L>, Vec<L>) {
-        let mut multiple_entries = Vec::default();
-        let mut next_entries = Vec::default();
-        let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_branch_modes);
-        let mut dfs = Dfs::empty(&filtered_graph);
-        let mut space = algo::DfsSpace::new(&self.graph);
-
-        // For each entry, see if it has labels which can't be reached by any other entry
-        for entry in entries {
-            dfs.reset(&filtered_graph);
-            dfs.move_to(self.nodes[&entry]);
-            
-        }
-
-        (multiple_entries, next_entries)
-    }*/
 }

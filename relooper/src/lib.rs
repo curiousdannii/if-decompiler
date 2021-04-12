@@ -25,7 +25,7 @@ use std::fmt::{Debug, Display};
 use fnv::{FnvHashMap, FnvHashSet};
 use petgraph::prelude::*;
 use petgraph::algo;
-use petgraph::visit::{EdgeFiltered, IntoNeighbors};
+use petgraph::visit::{EdgeFiltered, IntoNeighbors, Visitable, VisitMap};
 
 //mod graph;
 //use graph::*;
@@ -80,38 +80,43 @@ pub enum BranchMode {
     LoopContinue(u16),
 }
 
-// Internal types
-type LoopId = u16;
+/* =======================
+   Internal implementation
+   ======================= */
 
-#[derive(Debug)]
-struct LoopData {
-    id: LoopId,
-    next: FnvHashSet<NodeIndex>,
-}
+type LoopId = u16;
 
 #[derive(Debug)]
 enum Node<L> {
     Basic(L),
-    Loop(LoopData),
-    LoopMulti(LoopData),
+    Loop(LoopId),
+    LoopMulti(LoopId),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Edge<L> {
     Forward,
     ForwardMulti(L),
+    Next,
     LoopBreak(LoopId),
-    Back(LoopId),
-    BackMulti((L, LoopId)),
+    LoopBreakIntoMultiple((L, LoopId)),
+    LoopContinue(LoopId),
+    LoopContinueMulti((L, LoopId)),
     Removed,
 }
 
 fn filter_edges<L>(edge: petgraph::graph::EdgeReference<Edge<L>>) -> bool {
     use Edge::*;
     match edge.weight() {
-        Forward | ForwardMulti(_) | LoopBreak(_) => true,
+        Forward | ForwardMulti(_) | Next => true,
         _ => false,
     }
+}
+
+// Structure types, used in Relooper.move_undominated_edges_to_next
+enum Structure {
+    Loop(LoopId),
+    Multiple,
 }
 
 // The Relooper algorithm
@@ -157,14 +162,8 @@ impl<L: RelooperLabel> Relooper<L> {
         loop {
             let mut found_scc = false;
 
-            // Filter the graph to ignore processed back edges
-            let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
-
-            // Re-calculate dominators for determining loop breaks, etc
-            self.dominators = algo::dominators::simple_fast(&filtered_graph, self.nodes[&self.root]);
-
-            // Run the SCC algorithm
-            let sccs = algo::kosaraju_scc(&filtered_graph);
+            // Get the strongly connected components
+            let sccs = self.graph_sccs();
             for scc in sccs {
                 if scc.len() == 1 {
                     continue;
@@ -188,11 +187,7 @@ impl<L: RelooperLabel> Relooper<L> {
                 // Add the new node
                 let loop_id = self.counter;
                 self.counter += 1;
-                let loop_data = LoopData {
-                    id: loop_id,
-                    next: FnvHashSet::default(),
-                };
-                let loop_node = self.graph.add_node(if multi_loop { Node::LoopMulti(loop_data) } else { Node::Loop(loop_data) });
+                let loop_node = self.graph.add_node(if multi_loop { Node::LoopMulti(loop_id) } else { Node::Loop(loop_id) });
 
                 // Replace the incoming edges
                 for edge in edges {
@@ -209,38 +204,25 @@ impl<L: RelooperLabel> Relooper<L> {
                     self.graph.add_edge(loop_node, header, Edge::Forward);
                 }
 
-                // Now replace the outgoing edges
+                // If branching to a loop header, convert to a back edge
                 for &node in &scc {
                     let mut edges = self.graph.neighbors(node).detach();
                     while let Some((edge, target)) = edges.next(&self.graph) {
-                        // If branching to a loop header, convert to a back edge
                         if loop_headers.contains(&target) {
                             let target_label = match self.graph[target] {
                                 Node::Basic(label) => label,
                                 _ => panic!("Cannot replace an edge to a loop node"),
                             };
-                            self.graph.add_edge(node, loop_node, if multi_loop { Edge::BackMulti((target_label, loop_id)) } else { Edge::Back(loop_id) });
+                            self.graph.add_edge(node, loop_node, if multi_loop { Edge::LoopContinueMulti((target_label, loop_id)) } else { Edge::LoopContinue(loop_id) });
                             // Not sure if it's safe to directly remove the edge here
                             self.graph[edge] = Edge::Removed;
                         }
-                        // Otherwise if branching outside the SCC, convert to a Break if not dominated
-                        // But this won't detect non-dominated descendent nodes?
-                        else if !scc.contains(&target) {
-                            if let Some(dominator) = self.dominators.immediate_dominator(target) {
-                                if dominator != node {
-                                    self.graph[edge] = Edge::LoopBreak(loop_id);
-                                    let loop_data = &mut self.graph[loop_node];
-                                    match loop_data {
-                                        Node::Basic(_) => unreachable!(),
-                                        Node::Loop(data) | Node::LoopMulti(data) => {
-                                            data.next.insert(target);
-                                        },
-                                    };
-                                }
-                            }
-                        }
                     };
                 }
+                // Fix edges which are branching outside the loop
+                self.update_dominators();
+                self.move_undominated_edges_to_next(loop_node, loop_node, Structure::Loop(loop_id));
+                // TODO: patch LoopBreakIntoMultiple edges into LoopBreak when there is only one Next node
             }
 
             if found_scc == false {
@@ -250,6 +232,60 @@ impl<L: RelooperLabel> Relooper<L> {
 
         let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
         assert!(!algo::is_cyclic_directed(&filtered_graph), "Graph should not contain any cycles");
+    }
+
+    // Return the SCCs over a filtered graph
+    fn graph_sccs(&self) -> Vec<Vec<NodeIndex>> {
+        // Filter the graph to ignore processed back edges
+        let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
+        algo::kosaraju_scc(&filtered_graph)
+    }
+
+    // Given a node, find edges which are not dominated by it (loop or branch), and convert the edges to next edges on the structure head
+    fn move_undominated_edges_to_next(&mut self, dominator: NodeIndex, structure_head: NodeIndex, mode: Structure) {
+        // Prepare to manually walk through the graph
+        let mut stack = vec![dominator];
+        let mut discovered = self.graph.visit_map();
+
+        while let Some(node) = stack.pop() {
+            if discovered.visit(node) {
+                let mut edges = self.graph.neighbors(node).detach();
+                'edge_loop: while let Some((edge, target)) = edges.next(&self.graph) {
+                    match self.graph[edge] {
+                        Edge::Forward => {
+                            let dominators = self.dominators.strict_dominators(target).unwrap();
+                            for dom in dominators {
+                                if dom == dominator {
+                                    // This node is dominated by the structural dominator, so add it to the stack
+                                    if !discovered.is_visited(&target) {
+                                        stack.push(target);
+                                    }
+                                    continue 'edge_loop;
+                                }
+                            }
+                            // Not dominated, so convert the edges
+                            let target_label = match self.graph[target] {
+                                Node::Basic(label) => label,
+                                _ =>  panic!("Cannot replace an edge to a loop node"),
+                            };
+                            self.graph.update_edge(node, target, match mode {
+                                Structure::Loop(loop_id) => Edge::LoopBreakIntoMultiple((target_label, loop_id)),
+                                Structure::Multiple => unimplemented!(),
+                            });
+                            // Add an edge to the structure head
+                            self.graph.update_edge(structure_head, target, Edge::Next);
+                        },
+                        _ => {},
+                    };
+                }
+            }
+        }
+    }
+
+    fn update_dominators(&mut self) {
+        // Filter the graph to ignore processed back edges
+        let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
+        self.dominators = algo::dominators::simple_fast(&filtered_graph, self.nodes[&self.root]);
     }
 
     fn output(&self) -> Option<Box<ShapedBlock<L>>> {
@@ -290,14 +326,19 @@ impl<L: RelooperLabel> Relooper<L> {
                         next: if next.is_none() { self.reduce(next_entries) } else { None },
                     }))), next)
                 },
-                Node::Loop(data) => {
-                    let inner_entries = Vec::from_iter(filtered_graph.neighbors(node_id));
+                Node::Loop(loop_id) => {
+                    let mut edges = self.graph.neighbors(node_id).detach();
+                    let mut inner_entries = Vec::default();
                     let mut next_entries = Vec::new();
-                    for entry in &data.next {
-                        next_entries.push(*entry);
+                    while let Some((edge, target)) = edges.next(&self.graph) {
+                        match self.graph[edge] {
+                            Edge::Forward => inner_entries.push(target),
+                            Edge::Next => next_entries.push(target),
+                            _ => {},
+                        }
                     }
                     return (Some(Box::new(ShapedBlock::Loop(LoopBlock {
-                        loop_id: data.id,
+                        loop_id: *loop_id,
                         inner: self.reduce(inner_entries).unwrap(),
                         next: self.reduce(next_entries),
                     }))), None)

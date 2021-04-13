@@ -156,6 +156,25 @@ fn test_basic_loops() {
         }))),
         next: None,
     })));
+
+    // Test a self loop
+    let blocks = hashmap!{
+        0 => vec![0, 1],
+        1 => vec![],
+    };
+    let result = reloop(blocks, 0);
+    assert_eq!(result, Box::new(Loop(LoopBlock {
+        loop_id: 0,
+        inner: Box::new(Simple(SimpleBlock {
+            label: 0,
+            immediate: Some(Box::new(Simple(SimpleBlock {
+                label: 1,
+                immediate: None,
+                next: None,
+            }))),
+            next: None,
+        })),
+    })));
 }
 
 // Some basic ifs

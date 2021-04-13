@@ -181,15 +181,28 @@ impl<L: RelooperLabel> Relooper<L> {
     fn process_loops(&mut self) {
         // Loop until we have no more SCCs
         loop {
-            let mut found_scc = false;
+            let mut found_loop = false;
 
             // Get the strongly connected components
             let sccs = self.graph_sccs();
             for scc in sccs {
                 if scc.len() == 1 {
-                    continue;
+                    // Test for self-loops
+                    let node = scc[0];
+                    let mut found_self_loop = false;
+                    for edge in self.graph.edges(node) {
+                        if let Edge::Forward = edge.weight() {
+                            if edge.target() == node {
+                                found_self_loop = true;
+                                break;
+                            }
+                        }
+                    }
+                    if !found_self_loop {
+                        continue;
+                    }
                 }
-                found_scc = true;
+                found_loop = true;
 
                 // Determine whether this is a multi-loop or not
                 // Get all incoming edges and find the loop headers
@@ -237,7 +250,7 @@ impl<L: RelooperLabel> Relooper<L> {
                 // TODO: patch LoopBreakIntoMultiple edges into LoopBreak when there is only one Next node
             }
 
-            if found_scc == false {
+            if found_loop == false {
                 break;
             }
         }
@@ -401,9 +414,8 @@ impl<L: RelooperLabel> Relooper<L> {
                         let mut labels = Vec::default();
                         let mut edges = self.graph.neighbors(entry).detach();
                         while let Some((edge, target)) = edges.next(&self.graph) {
-                            match self.graph[edge] {
-                                Edge::Forward => labels.push(self.get_basic_node_label(target)),
-                                _ => {},
+                            if let Edge::Forward = self.graph[edge] {
+                                labels.push(self.get_basic_node_label(target));
                             }
                         }
                         labels

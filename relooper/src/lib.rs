@@ -42,7 +42,7 @@ pub fn reloop<L: RelooperLabel, S: BuildHasher>(blocks: HashMap<L, Vec<L>, S>, f
     let mut relooper = Relooper::new(blocks, first_label);
     relooper.process_loops();
     relooper.process_rejoined_branches();
-    relooper.output(vec![relooper.nodes[&first_label]]).unwrap()
+    relooper.output(vec![relooper.root]).unwrap()
 }
 
 // And returns a ShapedBlock tree
@@ -100,7 +100,7 @@ type LoopId = u16;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Node<L> {
-    Start,
+    Root,
     Basic(L),
     Loop(LoopId),
     LoopMulti(LoopId),
@@ -141,11 +141,11 @@ struct Relooper<L: RelooperLabel> {
     dominators: algo::dominators::Dominators<NodeIndex>,
     graph: Graph<Node<L>, Edge<L>>,
     nodes: FnvHashMap<L, NodeIndex>,
-    root: L,
+    root: NodeIndex,
 }
 
 impl<L: RelooperLabel> Relooper<L> {
-    fn new<S>(blocks: HashMap<L, Vec<L>, S>, root: L) -> Relooper<L>
+    fn new<S>(blocks: HashMap<L, Vec<L>, S>, root_label: L) -> Relooper<L>
     where S: BuildHasher
     {
         let mut graph = Graph::new();
@@ -163,13 +163,13 @@ impl<L: RelooperLabel> Relooper<L> {
             }
         }
 
-        // Mark the start of the graph, to make identifying when the root node is a loop easier
-        let start_node = graph.add_node(Node::Start);
-        graph.add_edge(start_node, nodes[&root], Edge::Forward);
+        // Add a root node to the graph, in order to handle when the first label is a loop
+        let root = graph.add_node(Node::Root);
+        graph.add_edge(root, nodes[&root_label], Edge::Forward);
 
         Relooper {
             counter: 0,
-            dominators: algo::dominators::simple_fast(&graph, nodes[&root]),
+            dominators: algo::dominators::simple_fast(&graph, root),
             graph,
             nodes,
             root,
@@ -249,7 +249,7 @@ impl<L: RelooperLabel> Relooper<L> {
     fn process_rejoined_branches(&mut self) {
         // Get the list of nodes in topological order and the dominators list
         let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
-        let dominators = algo::dominators::simple_fast(&filtered_graph, self.nodes[&self.root]);
+        let dominators = algo::dominators::simple_fast(&filtered_graph, self.root);
         let nodes = algo::toposort(&filtered_graph, None).unwrap();
 
         // Now in reverse order, go through the nodes, looking for those that have multiple incoming edges
@@ -295,6 +295,10 @@ impl<L: RelooperLabel> Relooper<L> {
             immediate_entries.dedup();
 
             match node {
+                Node::Root => {
+                    assert_eq!(next_entries.len(), 0, "Root node should have no next entries");
+                    return self.output(immediate_entries)
+                },
                 Node::Basic(label) => {
                     return Some(Box::new(ShapedBlock::Simple(SimpleBlock {
                         label: *label,
@@ -317,7 +321,6 @@ impl<L: RelooperLabel> Relooper<L> {
                         next: self.output(next_entries),
                     })))
                 },
-                _ => unimplemented!(),
             };
         }
 
@@ -409,6 +412,6 @@ impl<L: RelooperLabel> Relooper<L> {
     fn update_dominators(&mut self) {
         // Filter the graph to ignore processed back edges
         let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
-        self.dominators = algo::dominators::simple_fast(&filtered_graph, self.nodes[&self.root]);
+        self.dominators = algo::dominators::simple_fast(&filtered_graph, self.root);
     }
 }

@@ -258,36 +258,39 @@ fn test_nested_loops() {
         3 => vec![],
     };
     let result = reloop(blocks, 0);
-    assert_eq!(result, Box::new(Simple(SimpleBlock {
-        label: 0,
-        immediate: Some(Box::new(Multiple(MultipleBlock {
-            handled: vec![
-                HandledBlock {
-                    labels: vec![1],
-                    inner: Box::new(Loop(LoopBlock {
-                        loop_id: 1,
-                        inner: Box::new(Simple(SimpleBlock {
-                            label: 1,
-                            immediate: Some(Box::new(Simple(SimpleBlock {
-                                label: 2,
-                                immediate: None,
+    assert_eq!(result, Box::new(Loop(LoopBlock {
+        loop_id: 0,
+        inner: Box::new(Simple(SimpleBlock {
+            label: 0,
+            immediate: Some(Box::new(Multiple(MultipleBlock {
+                handled: vec![
+                    HandledBlock {
+                        labels: vec![1],
+                        inner: Box::new(Loop(LoopBlock {
+                            loop_id: 1,
+                            inner: Box::new(Simple(SimpleBlock {
+                                label: 1,
+                                immediate: Some(Box::new(Simple(SimpleBlock {
+                                    label: 2,
+                                    immediate: None,
+                                    next: None,
+                                }))),
                                 next: None,
-                            }))),
+                            })),
+                        })),
+                    },
+                    HandledBlock {
+                        labels: vec![3],
+                        inner: Box::new(Simple(SimpleBlock {
+                            label: 3,
+                            immediate: None,
                             next: None,
                         })),
-                    })),
-                },
-                HandledBlock {
-                    labels: vec![3],
-                    inner: Box::new(Simple(SimpleBlock {
-                        label: 3,
-                        immediate: None,
-                        next: None,
-                    })),
-                },
-            ],
-        }))),
-        next: None,
+                    },
+                ],
+            }))),
+            next: None,
+        })),
     })));
 }
 

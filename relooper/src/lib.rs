@@ -20,6 +20,7 @@ https://medium.com/leaningtech/solving-the-structured-control-flow-problem-once-
 use core::hash::{BuildHasher, Hash};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
+use std::iter::FromIterator;
 
 use fnv::{FnvHashMap, FnvHashSet};
 use petgraph::prelude::*;
@@ -75,7 +76,7 @@ pub struct LoopMultiBlock<L: RelooperLabel> {
 
 #[derive(Debug, PartialEq)]
 pub struct MultipleBlock<L: RelooperLabel> {
-    // TODO: switch back to a hashmap if there's only ever one label?
+    // It would be nicer to use a Hashmap here, but if the graph ever has triple branches it's possible you'd have a Multiple going into a LoopMulti, so we need a Vec of handled labels
     pub handled: Vec<HandledBlock<L>>,
 }
 
@@ -296,17 +297,23 @@ impl<L: RelooperLabel> Relooper<L> {
         if entries.len() == 1 {
             let node_id = entries[0];
             let node = &self.graph[node_id];
-            let mut immediate_entries = Vec::default();
-            let mut next_entries = Vec::default();
+            let mut all_entries = FnvHashSet::default();
+            let mut immediate_entries = FnvHashSet::default();
+            let mut next_entries = FnvHashSet::default();
             for edge in self.graph.edges(node_id) {
+                if let Edge::Removed = edge.weight() {
+                    continue;
+                }
+                all_entries.insert(edge.target());
                 match edge.weight() {
-                    Edge::Forward | Edge::ForwardMulti(_) => immediate_entries.push(edge.target()),
-                    Edge::Next => next_entries.push(edge.target()),
+                    Edge::Forward | Edge::ForwardMulti(_) => { immediate_entries.insert(edge.target()); },
+                    Edge::Next => { next_entries.insert(edge.target()); },
                     _ => {},
                 };
             }
             // Dedup the ForwardMulti edges
-            immediate_entries.dedup();
+            let immediate_entries = Vec::from_iter(immediate_entries);
+            let next_entries = Vec::from_iter(next_entries);
 
             return match node {
                 Node::Root => {
@@ -316,7 +323,8 @@ impl<L: RelooperLabel> Relooper<L> {
                 Node::Basic(label) => {
                     Some(Box::new(ShapedBlock::Simple(SimpleBlock {
                         label: *label,
-                        immediate: if next_entries.len() > 0 {
+                        // If we originally branched here, return a MultipleBlock even if there's now only one immediate entry
+                        immediate: if all_entries.len() > 1 && immediate_entries.len() > 0 {
                             let handled = self.output_multiple_handled(immediate_entries);
                             Some(Box::new(ShapedBlock::Multiple(MultipleBlock {
                                 handled,
@@ -418,6 +426,7 @@ impl<L: RelooperLabel> Relooper<L> {
                                 labels.push(self.get_basic_node_label(target));
                             }
                         }
+                        labels.sort();
                         labels
                     },
                     _ => unimplemented!(),

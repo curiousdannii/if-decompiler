@@ -167,10 +167,17 @@ fn test_basic_loops() {
         loop_id: 0,
         inner: Box::new(Simple(SimpleBlock {
             label: 0,
-            immediate: Some(Box::new(Simple(SimpleBlock {
-                label: 1,
-                immediate: None,
-                next: None,
+            immediate: Some(Box::new(Multiple(MultipleBlock {
+                handled: vec![
+                    HandledBlock {
+                        labels: vec![1],
+                        inner: Box::new(Simple(SimpleBlock {
+                            label: 1,
+                            immediate: None,
+                            next: None,
+                        })),
+                    },
+                ],
             }))),
             next: None,
         })),
@@ -658,10 +665,17 @@ fn test_stackifier_multiloop() {
                     labels: vec!['B'],
                     inner: Box::new(Simple(SimpleBlock {
                         label: 'B',
-                        immediate: Some(Box::new(Simple(SimpleBlock {
-                            label: 'D',
-                            immediate: None,
-                            next: None,
+                        immediate: Some(Box::new(Multiple(MultipleBlock {
+                            handled: vec![
+                                HandledBlock {
+                                    labels: vec!['D'],
+                                    inner: Box::new(Simple(SimpleBlock {
+                                        label: 'D',
+                                        immediate: None,
+                                        next: None,
+                                    })),
+                                },
+                            ],
                         }))),
                         next: None,
                     })),
@@ -691,14 +705,78 @@ fn test_stackifier_multiloop() {
                 }))),
                 next: Some(Box::new(Simple(SimpleBlock {
                     label: 'G',
-                    immediate: Some(Box::new(Simple(SimpleBlock {
-                        label: 'H',
-                        immediate: None,
-                        next: None,
+                    immediate: Some(Box::new(Multiple(MultipleBlock {
+                        handled: vec![
+                            HandledBlock {
+                                labels: vec!['H'],
+                                inner: Box::new(Simple(SimpleBlock {
+                                    label: 'H',
+                                    immediate: None,
+                                    next: None,
+                                })),
+                            },
+                        ],
                     }))),
                     next: None,
                 }))),
             }))),
+        }))),
+        next: None,
+    })));
+}
+
+#[test]
+fn test_loopmulti() {
+    let blocks = hashmap!{
+        1 => vec![2, 3, 4],
+        2 => vec![],
+        3 => vec![4],
+        4 => vec![5],
+        5 => vec![3],
+    };
+    let result = reloop(blocks, 1);
+    assert_eq!(result, Box::new(Simple(SimpleBlock {
+        label: 1,
+        immediate: Some(Box::new(Multiple(MultipleBlock {
+            handled: vec![
+                HandledBlock {
+                    labels: vec![2],
+                    inner: Box::new(Simple(SimpleBlock {
+                        label: 2,
+                        immediate: None,
+                        next: None,
+                    })),
+                },
+                HandledBlock {
+                    labels: vec![3, 4],
+                    inner: Box::new(LoopMulti(LoopMultiBlock {
+                        loop_id: 0,
+                        handled: vec![
+                            HandledBlock {
+                                labels: vec![3],
+                                inner: Box::new(Simple(SimpleBlock {
+                                    label: 3,
+                                    immediate: None,
+                                    next: None,
+                                })),
+                            },
+                            HandledBlock {
+                                labels: vec![4],
+                                inner: Box::new(Simple(SimpleBlock {
+                                    label: 4,
+                                    immediate: Some(Box::new(Simple(SimpleBlock {
+                                        label: 5,
+                                        immediate: None,
+                                        next: None,
+                                    }))),
+                                    next: None,
+                                })),
+                            },
+                        ],
+                        next: None,
+                    })),
+                },
+            ],
         }))),
         next: None,
     })));

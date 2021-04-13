@@ -376,3 +376,65 @@ fn test_nested_ifs() {
         }))),
     })));
 }
+
+// The example from the Stackifier article
+#[test]
+fn test_stackifier_multiloop() {
+    let blocks = hashmap!{
+        'A' => vec!['B', 'C'],
+        'B' => vec!['D', 'E'],
+        'C' => vec!['E'],
+        'D' => vec!['B', 'C'],
+        'E' => vec!['F', 'G'],
+        'F' => vec!['G'],
+        'G' => vec!['B', 'H'],
+        'H' => vec![],
+    };
+    let result = reloop(blocks, 'A');
+    assert_eq!(result, Box::new(Simple(SimpleBlock {
+        label: 'A',
+        immediate: Some(Box::new(LoopMulti(LoopMultiBlock {
+            loop_id: 0,
+            handled: vec![
+                HandledBlock {
+                    labels: vec!['B'],
+                    inner: Box::new(Simple(SimpleBlock {
+                        label: 'B',
+                        immediate: Some(Box::new(Simple(SimpleBlock {
+                            label: 'D',
+                            immediate: None,
+                            next: None,
+                        }))),
+                        next: None,
+                    })),
+                },
+                HandledBlock {
+                    labels: vec!['C'],
+                    inner: Box::new(Simple(SimpleBlock {
+                        label: 'C',
+                        immediate: None,
+                        next: None,
+                    })),
+                },
+            ],
+            next: Some(Box::new(Simple(SimpleBlock {
+                label: 'E',
+                immediate: Some(Box::new(Simple(SimpleBlock {
+                    label: 'F',
+                    immediate: None,
+                    next: None,
+                }))),
+                next: Some(Box::new(Simple(SimpleBlock {
+                    label: 'G',
+                    immediate: Some(Box::new(Simple(SimpleBlock {
+                        label: 'H',
+                        immediate: None,
+                        next: None,
+                    }))),
+                    next: None,
+                }))),
+            }))),
+        }))),
+        next: None,
+    })));
+}

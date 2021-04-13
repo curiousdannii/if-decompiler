@@ -20,7 +20,6 @@ https://medium.com/leaningtech/solving-the-structured-control-flow-problem-once-
 use core::hash::{BuildHasher, Hash};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
-use std::iter::FromIterator;
 
 use fnv::{FnvHashMap, FnvHashSet};
 use petgraph::prelude::*;
@@ -51,6 +50,7 @@ pub fn reloop<L: RelooperLabel, S: BuildHasher>(blocks: HashMap<L, Vec<L>, S>, f
 pub enum ShapedBlock<L: RelooperLabel> {
     Simple(SimpleBlock<L>),
     Loop(LoopBlock<L>),
+    LoopMulti(LoopMultiBlock<L>),
     Multiple(MultipleBlock<L>),
 }
 
@@ -65,6 +65,12 @@ pub struct SimpleBlock<L: RelooperLabel> {
 pub struct LoopBlock<L: RelooperLabel> {
     pub loop_id: u16,
     pub inner: Box<ShapedBlock<L>>,
+}
+#[derive(Debug, PartialEq)]
+pub struct LoopMultiBlock<L: RelooperLabel> {
+    pub loop_id: u16,
+    pub handled: Vec<HandledBlock<L>>,
+    pub next: Option<Box<ShapedBlock<L>>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -276,17 +282,20 @@ impl<L: RelooperLabel> Relooper<L> {
         if entries.len() == 1 {
             let node_id = entries[0];
             let node = &self.graph[node_id];
+            let mut immediate_entries = Vec::default();
+            let mut next_entries = Vec::default();
+            for edge in self.graph.edges(node_id) {
+                match edge.weight() {
+                    Edge::Forward | Edge::ForwardMulti(_) => immediate_entries.push(edge.target()),
+                    Edge::Next => next_entries.push(edge.target()),
+                    _ => {},
+                };
+            }
+            // Dedup the ForwardMulti edges
+            immediate_entries.dedup();
+
             match node {
                 Node::Basic(label) => {
-                    let mut immediate_entries = Vec::default();
-                    let mut next_entries = Vec::default();
-                    for edge in self.graph.edges(node_id) {
-                        match edge.weight() {
-                            Edge::Forward => immediate_entries.push(edge.target()),
-                            Edge::Next => next_entries.push(edge.target()),
-                            _ => {},
-                        };
-                    }
                     return Some(Box::new(ShapedBlock::Simple(SimpleBlock {
                         label: *label,
                         immediate: self.output(immediate_entries),
@@ -294,19 +303,18 @@ impl<L: RelooperLabel> Relooper<L> {
                     })))
                 },
                 Node::Loop(loop_id) => {
-                    let mut edges = self.graph.neighbors(node_id).detach();
-                    let mut inner_entries = Vec::default();
-                    let mut next_entries = Vec::new();
-                    while let Some((edge, target)) = edges.next(&self.graph) {
-                        match self.graph[edge] {
-                            Edge::Forward => inner_entries.push(target),
-                            Edge::Next => next_entries.push(target),
-                            _ => {},
-                        }
-                    }
+                    assert_eq!(next_entries.len(), 0, "Loop nodes should have no next entries");
                     return Some(Box::new(ShapedBlock::Loop(LoopBlock {
                         loop_id: *loop_id,
-                        inner: self.output(inner_entries).unwrap(),
+                        inner: self.output(immediate_entries).unwrap(),
+                    })))
+                },
+                Node::LoopMulti(loop_id) => {
+                    let handled = self.output_multiple_handled(immediate_entries);
+                    return Some(Box::new(ShapedBlock::LoopMulti(LoopMultiBlock {
+                        loop_id: *loop_id,
+                        handled,
+                        next: self.output(next_entries),
                     })))
                 },
                 _ => unimplemented!(),
@@ -314,19 +322,7 @@ impl<L: RelooperLabel> Relooper<L> {
         }
 
         // Multiples
-        let mut handled = Vec::default();
-        for entry in entries {
-            handled.push(HandledBlock {
-                labels: match self.graph[entry] {
-                    Node::Basic(label) => vec![label],
-                    Node::Loop(_) | Node::LoopMulti(_) => Vec::from_iter(self.graph.neighbors(entry).map(|n| self.get_basic_node_label(n))),
-                    _ => unimplemented!(),
-                },
-                inner: self.output(vec![entry]).unwrap(),
-            });
-        }
-        // Sort so that the tests will work
-        handled.sort_by(|a, b| a.labels.cmp(&b.labels));
+        let handled = self.output_multiple_handled(entries);
         Some(Box::new(ShapedBlock::Multiple(MultipleBlock {
             handled,
         })))
@@ -381,6 +377,33 @@ impl<L: RelooperLabel> Relooper<L> {
                 }
             }
         }
+    }
+
+    fn output_multiple_handled(&self, entries: Vec<NodeIndex>) -> Vec<HandledBlock<L>> {
+        let mut handled = Vec::default();
+        for entry in entries {
+            handled.push(HandledBlock {
+                labels: match self.graph[entry] {
+                    Node::Basic(label) => vec![label],
+                    Node::Loop(_) | Node::LoopMulti(_) => {
+                        let mut labels = Vec::default();
+                        let mut edges = self.graph.neighbors(entry).detach();
+                        while let Some((edge, target)) = edges.next(&self.graph) {
+                            match self.graph[edge] {
+                                Edge::Forward => labels.push(self.get_basic_node_label(target)),
+                                _ => {},
+                            }
+                        }
+                        labels
+                    },
+                    _ => unimplemented!(),
+                },
+                inner: self.output(vec![entry]).unwrap(),
+            });
+        }
+        // Sort so that the tests will work
+        handled.sort_by(|a, b| a.labels.cmp(&b.labels));
+        handled
     }
 
     fn update_dominators(&mut self) {

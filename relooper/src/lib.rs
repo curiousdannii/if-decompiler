@@ -19,13 +19,12 @@ https://medium.com/leaningtech/solving-the-structured-control-flow-problem-once-
 
 use core::hash::{BuildHasher, Hash};
 use std::collections::HashMap;
-use std::iter::FromIterator;
 use std::fmt::{Debug, Display};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use petgraph::prelude::*;
 use petgraph::algo;
-use petgraph::visit::{EdgeFiltered, IntoNeighbors, Visitable, VisitMap};
+use petgraph::visit::{EdgeFiltered, Visitable, VisitMap};
 
 //mod graph;
 //use graph::*;
@@ -42,7 +41,8 @@ where T: Copy + Debug + Display + Eq + Hash {}
 pub fn reloop<L: RelooperLabel, S: BuildHasher>(blocks: HashMap<L, Vec<L>, S>, first_label: L) -> Box<ShapedBlock<L>> {
     let mut relooper = Relooper::new(blocks, first_label);
     relooper.process_loops();
-    relooper.output().unwrap()
+    relooper.process_rejoined_branches();
+    relooper.output(vec![relooper.nodes[&first_label]]).unwrap()
 }
 
 // And returns a ShapedBlock tree
@@ -56,6 +56,7 @@ pub enum ShapedBlock<L: RelooperLabel> {
 #[derive(Debug, PartialEq)]
 pub struct SimpleBlock<L: RelooperLabel> {
     pub label: L,
+    pub immediate: Option<Box<ShapedBlock<L>>>,
     pub next: Option<Box<ShapedBlock<L>>>,
 }
 
@@ -63,13 +64,11 @@ pub struct SimpleBlock<L: RelooperLabel> {
 pub struct LoopBlock<L: RelooperLabel> {
     pub loop_id: u16,
     pub inner: Box<ShapedBlock<L>>,
-    pub next: Option<Box<ShapedBlock<L>>>,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct MultipleBlock<L: RelooperLabel> {
     pub handled: FnvHashMap<L, Box<ShapedBlock<L>>>,
-    pub next: Option<Box<ShapedBlock<L>>>,
 }
 
 // Branch modes
@@ -95,13 +94,16 @@ enum Node<L> {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Edge<L> {
+    // Edges that form the acyclic CFG
     Forward,
     ForwardMulti(L),
     Next,
+    // Edges that will be filtered out when traversing the graph
     LoopBreak(LoopId),
-    LoopBreakIntoMultiple((L, LoopId)),
+    LoopBreakIntoMultiple(LoopId),
     LoopContinue(LoopId),
-    LoopContinueMulti((L, LoopId)),
+    LoopContinueMulti(LoopId),
+    MergedBranch(L),
     Removed,
 }
 
@@ -191,10 +193,7 @@ impl<L: RelooperLabel> Relooper<L> {
 
                 // Replace the incoming edges
                 for edge in edges {
-                    let target_label = match self.graph[edge.2] {
-                        Node::Basic(label) => label,
-                        _ => panic!("Cannot replace an edge to a loop node"),
-                    };
+                    let target_label = self.get_basic_node_label(edge.2);
                     self.graph.add_edge(edge.1, loop_node, if multi_loop { Edge::ForwardMulti(target_label) } else { Edge::Forward });
                     // Cannot remove edges without potentially breaking other edge indexes, so mark them as removed for now
                     self.graph[edge.0] = Edge::Removed;
@@ -209,19 +208,13 @@ impl<L: RelooperLabel> Relooper<L> {
                     let mut edges = self.graph.neighbors(node).detach();
                     while let Some((edge, target)) = edges.next(&self.graph) {
                         if loop_headers.contains(&target) {
-                            let target_label = match self.graph[target] {
-                                Node::Basic(label) => label,
-                                _ => panic!("Cannot replace an edge to a loop node"),
-                            };
-                            self.graph.add_edge(node, loop_node, if multi_loop { Edge::LoopContinueMulti((target_label, loop_id)) } else { Edge::LoopContinue(loop_id) });
-                            // Not sure if it's safe to directly remove the edge here
-                            self.graph[edge] = Edge::Removed;
+                            self.graph[edge] = if multi_loop { Edge::LoopContinueMulti(loop_id) } else { Edge::LoopContinue(loop_id) };
                         }
                     };
                 }
                 // Fix edges which are branching outside the loop
-                self.update_dominators();
-                self.move_undominated_edges_to_next(loop_node, loop_node, Structure::Loop(loop_id));
+                //self.update_dominators();
+                //self.move_undominated_edges_to_next(loop_node, loop_node, Structure::Loop(loop_id));
                 // TODO: patch LoopBreakIntoMultiple edges into LoopBreak when there is only one Next node
             }
 
@@ -232,6 +225,97 @@ impl<L: RelooperLabel> Relooper<L> {
 
         let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
         assert!(!algo::is_cyclic_directed(&filtered_graph), "Graph should not contain any cycles");
+    }
+
+    // Handle branches that merge back together
+    fn process_rejoined_branches(&mut self) {
+        // Get the list of nodes in topological order and the dominators list
+        let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
+        let dominators = algo::dominators::simple_fast(&filtered_graph, self.nodes[&self.root]);
+        let nodes = algo::toposort(&filtered_graph, None).unwrap();
+
+        // Now in reverse order, go through the nodes, looking for those that have multiple incoming edges
+        for &node in nodes.iter().rev() {
+            let mut incoming_edges = Vec::default();
+            for edge in self.graph.edges_directed(node, Incoming) {
+                if let Edge::Forward = edge.weight() {
+                    incoming_edges.push(edge.id());
+                }
+            }
+            if incoming_edges.len() > 1 {
+                // Add a Next edge to the dominator pointing to this node
+                let dominator = dominators.immediate_dominator(node).unwrap();
+                self.graph.add_edge(dominator, node, Edge::Next);
+                // Patch the incoming edges
+                for edge in incoming_edges {
+                    self.graph[edge] = Edge::MergedBranch(self.get_basic_node_label(node));
+                }
+            }
+        }
+    }
+
+    // Output the graph as blocks
+    fn output(&self, entries: Vec<NodeIndex>) -> Option<Box<ShapedBlock<L>>> {
+        if entries.len() == 0 {
+            return None
+        }
+
+        // If we have one entry, then return the appropriate block
+        if entries.len() == 1 {
+            let node_id = entries[0];
+            let node = &self.graph[node_id];
+            match node {
+                Node::Basic(label) => {
+                    let mut immediate_entries = Vec::default();
+                    let mut next_entries = Vec::default();
+                    for edge in self.graph.edges(node_id) {
+                        match edge.weight() {
+                            Edge::Forward => immediate_entries.push(edge.target()),
+                            Edge::Next => next_entries.push(edge.target()),
+                            _ => {},
+                        };
+                    }
+                    return Some(Box::new(ShapedBlock::Simple(SimpleBlock {
+                        label: *label,
+                        immediate: self.output(immediate_entries),
+                        next: self.output(next_entries),
+                    })))
+                },
+                Node::Loop(loop_id) => {
+                    let mut edges = self.graph.neighbors(node_id).detach();
+                    let mut inner_entries = Vec::default();
+                    let mut next_entries = Vec::new();
+                    while let Some((edge, target)) = edges.next(&self.graph) {
+                        match self.graph[edge] {
+                            Edge::Forward => inner_entries.push(target),
+                            Edge::Next => next_entries.push(target),
+                            _ => {},
+                        }
+                    }
+                    return Some(Box::new(ShapedBlock::Loop(LoopBlock {
+                        loop_id: *loop_id,
+                        inner: self.output(inner_entries).unwrap(),
+                    })))
+                },
+                _ => unimplemented!(),
+            };
+        }
+
+        // Multiples
+        let mut handled = FnvHashMap::default();
+        for entry in entries {
+            handled.insert(self.get_basic_node_label(entry), self.output(vec![entry]).unwrap());
+        }
+        Some(Box::new(ShapedBlock::Multiple(MultipleBlock {
+            handled,
+        })))
+    }
+
+    fn get_basic_node_label(&self, id: NodeIndex) -> L {
+        match self.graph[id] {
+            Node::Basic(label) => label,
+            _ => panic!("Cannot get label of loop node"),
+        }
     }
 
     // Return the SCCs over a filtered graph
@@ -264,12 +348,8 @@ impl<L: RelooperLabel> Relooper<L> {
                                 }
                             }
                             // Not dominated, so convert the edges
-                            let target_label = match self.graph[target] {
-                                Node::Basic(label) => label,
-                                _ =>  panic!("Cannot replace an edge to a loop node"),
-                            };
                             self.graph.update_edge(node, target, match mode {
-                                Structure::Loop(loop_id) => Edge::LoopBreakIntoMultiple((target_label, loop_id)),
+                                Structure::Loop(loop_id) => Edge::LoopBreakIntoMultiple(loop_id),
                                 Structure::Multiple => unimplemented!(),
                             });
                             // Add an edge to the structure head
@@ -286,87 +366,5 @@ impl<L: RelooperLabel> Relooper<L> {
         // Filter the graph to ignore processed back edges
         let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
         self.dominators = algo::dominators::simple_fast(&filtered_graph, self.nodes[&self.root]);
-    }
-
-    fn output(&self) -> Option<Box<ShapedBlock<L>>> {
-        self.reduce(vec![self.nodes[&self.root]])
-    }
-
-    fn reduce(&self, entries: Vec<NodeIndex>) -> Option<Box<ShapedBlock<L>>> {
-        let result = self.reduce_with_next(entries);
-        assert!(result.1.is_none(), "No dangling next entries");
-        result.0
-    }
-
-    fn reduce_with_next(&self, entries: Vec<NodeIndex>) -> (Option<Box<ShapedBlock<L>>>, Option<NodeIndex>) {
-        if entries.len() == 0 {
-            return (None, None)
-        }
-
-        let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
-
-        // If we have one entry, then return the appropriate block
-        if entries.len() == 1 {
-            let node_id = entries[0];
-            let node = &self.graph[node_id];
-            return match node {
-                Node::Basic(label) => {
-                    let mut next = None;
-                    let next_entries = Vec::from_iter(filtered_graph.neighbors(node_id));
-                    if next_entries.len() == 1 {
-                        let next_node = next_entries[0];
-                        if let Some(dominator) = self.dominators.immediate_dominator(next_node) {
-                            if dominator != node_id {
-                                next = Some(next_node);
-                            }
-                        }
-                    }
-                    return (Some(Box::new(ShapedBlock::Simple(SimpleBlock {
-                        label: *label,
-                        next: if next.is_none() { self.reduce(next_entries) } else { None },
-                    }))), next)
-                },
-                Node::Loop(loop_id) => {
-                    let mut edges = self.graph.neighbors(node_id).detach();
-                    let mut inner_entries = Vec::default();
-                    let mut next_entries = Vec::new();
-                    while let Some((edge, target)) = edges.next(&self.graph) {
-                        match self.graph[edge] {
-                            Edge::Forward => inner_entries.push(target),
-                            Edge::Next => next_entries.push(target),
-                            _ => {},
-                        }
-                    }
-                    return (Some(Box::new(ShapedBlock::Loop(LoopBlock {
-                        loop_id: *loop_id,
-                        inner: self.reduce(inner_entries).unwrap(),
-                        next: self.reduce(next_entries),
-                    }))), None)
-                },
-                _ => { (None, None) },
-            }
-        }
-
-        // Handle multiple entries
-        let mut handled = FnvHashMap::default();
-        let mut next_entries = FnvHashSet::default();
-        for entry in entries {
-            let node = &self.graph[entry];
-            let label = match node {
-                Node::Basic(label) => *label,
-                _ => panic!("Non-basic nodes in multiple"),
-            };
-            let result = self.reduce_with_next(vec![entry]);
-            if let Some(handled_node) = result.0 {
-                handled.insert(label, handled_node);
-            }
-            if let Some(next) = result.1 {
-                next_entries.insert(next);
-            }
-        }
-        (Some(Box::new(ShapedBlock::Multiple(MultipleBlock {
-            handled,
-            next: self.reduce(Vec::from_iter(next_entries)),
-        }))), None)
     }
 }

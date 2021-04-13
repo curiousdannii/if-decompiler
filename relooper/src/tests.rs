@@ -27,13 +27,16 @@ fn test_basic_blocks() {
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
-        next: Some(Box::new(Simple(SimpleBlock {
+        immediate: Some(Box::new(Simple(SimpleBlock {
             label: 1,
-            next: Some(Box::new(Simple(SimpleBlock {
+            immediate: Some(Box::new(Simple(SimpleBlock {
                 label: 2,
+                immediate: None,
                 next: None,
             }))),
+            next: None,
         }))),
+        next: None,
     })));
 }
 
@@ -49,20 +52,23 @@ fn test_basic_loops() {
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
-        next: Some(Box::new(Loop(LoopBlock {
+        immediate: Some(Box::new(Loop(LoopBlock {
             loop_id: 0,
             inner: Box::new(Simple(SimpleBlock {
                 label: 1,
-                next: Some(Box::new(Simple(SimpleBlock {
+                immediate: Some(Box::new(Simple(SimpleBlock {
                     label: 2,
-                    next: Some(Box::new(Simple(SimpleBlock {
+                    immediate: Some(Box::new(Simple(SimpleBlock {
                         label: 3,
+                        immediate: None,
                         next: None,
                     }))),
+                    next: None,
                 }))),
+                next: None,
             })),
-            next: None,
         }))),
+        next: None,
     })));
 
     let blocks = hashmap!{
@@ -75,29 +81,32 @@ fn test_basic_loops() {
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
-        next: Some(Box::new(Loop(LoopBlock {
+        immediate: Some(Box::new(Loop(LoopBlock {
             loop_id: 0,
             inner: Box::new(Simple(SimpleBlock {
                 label: 1,
-                next: Some(Box::new(Multiple(MultipleBlock {
+                immediate: Some(Box::new(Multiple(MultipleBlock {
                     handled: FnvHashMap::from_iter(vec![
                         (2, Box::new(Simple(SimpleBlock {
                             label: 2,
-                            next: Some(Box::new(Simple(SimpleBlock {
+                            immediate: Some(Box::new(Simple(SimpleBlock {
                                 label: 3,
+                                immediate: None,
                                 next: None,
                             }))),
+                            next: None,
                         }))),
                         (4, Box::new(Simple(SimpleBlock {
                             label: 4,
+                            immediate: None,
                             next: None,
                         }))),
                     ]),
-                    next: None,
                 }))),
+                next: None,
             })),
-            next: None,
         }))),
+        next: None,
     })));
 
     let blocks = hashmap!{
@@ -110,29 +119,32 @@ fn test_basic_loops() {
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
-        next: Some(Box::new(Loop(LoopBlock {
+        immediate: Some(Box::new(Loop(LoopBlock {
             loop_id: 0,
             inner: Box::new(Simple(SimpleBlock {
                 label: 1,
-                next: Some(Box::new(Simple(SimpleBlock {
+                immediate: Some(Box::new(Simple(SimpleBlock {
                     label: 2,
-                    next: Some(Box::new(Multiple(MultipleBlock {
+                    immediate: Some(Box::new(Multiple(MultipleBlock {
                         handled: FnvHashMap::from_iter(vec![
                             (3, Box::new(Simple(SimpleBlock {
                                 label: 3,
+                                immediate: None,
                                 next: None,
                             }))),
                             (4, Box::new(Simple(SimpleBlock {
                                 label: 4,
+                                immediate: None,
                                 next: None,
                             }))),
                         ]),
-                        next: None,
                     }))),
+                    next: None,
                 }))),
+                next: None,
             })),
-            next: None,
         }))),
+        next: None,
     })));
 }
 
@@ -147,19 +159,21 @@ fn test_basic_ifs() {
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
-        next: Some(Box::new(Multiple(MultipleBlock {
+        immediate: Some(Box::new(Multiple(MultipleBlock {
             handled: FnvHashMap::from_iter(vec![
                 (1, Box::new(Simple(SimpleBlock {
                     label: 1,
+                    immediate: None,
                     next: None,
                 }))),
                 (2, Box::new(Simple(SimpleBlock {
                     label: 2,
+                    immediate: None,
                     next: None,
                 }))),
             ]),
-            next: None,
         }))),
+        next: None,
     })));
 
     let blocks = hashmap!{
@@ -171,21 +185,44 @@ fn test_basic_ifs() {
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
-        next: Some(Box::new(Multiple(MultipleBlock {
+        immediate: Some(Box::new(Multiple(MultipleBlock {
             handled: FnvHashMap::from_iter(vec![
                 (1, Box::new(Simple(SimpleBlock {
                     label: 1,
+                    immediate: None,
                     next: None,
                 }))),
                 (2, Box::new(Simple(SimpleBlock {
                     label: 2,
+                    immediate: None,
                     next: None,
                 }))),
             ]),
-            next: Some(Box::new(Simple(SimpleBlock {
-                label: 3,
-                next: None,
-            }))),
+        }))),
+        next: Some(Box::new(Simple(SimpleBlock {
+            label: 3,
+            immediate: None,
+            next: None,
+        }))),
+    })));
+
+    let blocks = hashmap!{
+        0 => vec![1, 2],
+        1 => vec![2],
+        2 => vec![],
+    };
+    let result = reloop(blocks, 0);
+    assert_eq!(result, Box::new(Simple(SimpleBlock {
+        label: 0,
+        immediate: Some(Box::new(Simple(SimpleBlock {
+            label: 1,
+            immediate: None,
+            next: None,
+        }))),
+        next: Some(Box::new(Simple(SimpleBlock {
+            label: 2,
+            immediate: None,
+            next: None,
         }))),
     })));
 }

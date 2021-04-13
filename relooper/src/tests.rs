@@ -236,10 +236,17 @@ fn test_basic_ifs() {
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
-        immediate: Some(Box::new(Simple(SimpleBlock {
-            label: 1,
-            immediate: None,
-            next: None,
+        immediate: Some(Box::new(Multiple(MultipleBlock {
+            handled: vec![
+                HandledBlock {
+                    labels: vec![1],
+                    inner: Box::new(Simple(SimpleBlock {
+                        label: 1,
+                        immediate: None,
+                        next: None,
+                    })),
+                },
+            ],
         }))),
         next: Some(Box::new(Simple(SimpleBlock {
             label: 2,
@@ -422,10 +429,17 @@ fn test_stackifier_multiloop() {
             ],
             next: Some(Box::new(Simple(SimpleBlock {
                 label: 'E',
-                immediate: Some(Box::new(Simple(SimpleBlock {
-                    label: 'F',
-                    immediate: None,
-                    next: None,
+                immediate: Some(Box::new(Multiple(MultipleBlock {
+                    handled: vec![
+                        HandledBlock {
+                            labels: vec!['F'],
+                            inner: Box::new(Simple(SimpleBlock {
+                                label: 'F',
+                                immediate: None,
+                                next: None,
+                            })),
+                        },
+                    ],
                 }))),
                 next: Some(Box::new(Simple(SimpleBlock {
                     label: 'G',

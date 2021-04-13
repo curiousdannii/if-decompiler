@@ -75,6 +75,7 @@ pub struct LoopMultiBlock<L: RelooperLabel> {
 
 #[derive(Debug, PartialEq)]
 pub struct MultipleBlock<L: RelooperLabel> {
+    // TODO: switch back to a hashmap if there's only ever one label?
     pub handled: Vec<HandledBlock<L>>,
 }
 
@@ -294,34 +295,42 @@ impl<L: RelooperLabel> Relooper<L> {
             // Dedup the ForwardMulti edges
             immediate_entries.dedup();
 
-            match node {
+            return match node {
                 Node::Root => {
                     assert_eq!(next_entries.len(), 0, "Root node should have no next entries");
-                    return self.output(immediate_entries)
+                    self.output(immediate_entries)
                 },
                 Node::Basic(label) => {
-                    return Some(Box::new(ShapedBlock::Simple(SimpleBlock {
+                    Some(Box::new(ShapedBlock::Simple(SimpleBlock {
                         label: *label,
-                        immediate: self.output(immediate_entries),
+                        immediate: if next_entries.len() > 0 {
+                            let handled = self.output_multiple_handled(immediate_entries);
+                            Some(Box::new(ShapedBlock::Multiple(MultipleBlock {
+                                handled,
+                            })))
+                        }
+                        else {
+                            self.output(immediate_entries)
+                        },
                         next: self.output(next_entries),
                     })))
                 },
                 Node::Loop(loop_id) => {
                     assert_eq!(next_entries.len(), 0, "Loop nodes should have no next entries");
-                    return Some(Box::new(ShapedBlock::Loop(LoopBlock {
+                    Some(Box::new(ShapedBlock::Loop(LoopBlock {
                         loop_id: *loop_id,
                         inner: self.output(immediate_entries).unwrap(),
                     })))
                 },
                 Node::LoopMulti(loop_id) => {
                     let handled = self.output_multiple_handled(immediate_entries);
-                    return Some(Box::new(ShapedBlock::LoopMulti(LoopMultiBlock {
+                    Some(Box::new(ShapedBlock::LoopMulti(LoopMultiBlock {
                         loop_id: *loop_id,
                         handled,
                         next: self.output(next_entries),
                     })))
                 },
-            };
+            }
         }
 
         // Multiples

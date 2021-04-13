@@ -20,6 +20,7 @@ https://medium.com/leaningtech/solving-the-structured-control-flow-problem-once-
 use core::hash::{BuildHasher, Hash};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
+use std::iter::FromIterator;
 
 use fnv::{FnvHashMap, FnvHashSet};
 use petgraph::prelude::*;
@@ -33,9 +34,9 @@ use petgraph::visit::{EdgeFiltered, Visitable, VisitMap};
 mod tests;
 
 // Common traits for labels
-pub trait RelooperLabel: Copy + Debug + Display + Eq + Hash {}
+pub trait RelooperLabel: Copy + Debug + Display + Eq + Hash + Ord {}
 impl<T> RelooperLabel for T
-where T: Copy + Debug + Display + Eq + Hash {}
+where T: Copy + Debug + Display + Eq + Hash + Ord {}
 
 // The Relooper accepts a map of block labels to the labels each block can branch to
 pub fn reloop<L: RelooperLabel, S: BuildHasher>(blocks: HashMap<L, Vec<L>, S>, first_label: L) -> Box<ShapedBlock<L>> {
@@ -68,7 +69,13 @@ pub struct LoopBlock<L: RelooperLabel> {
 
 #[derive(Debug, PartialEq)]
 pub struct MultipleBlock<L: RelooperLabel> {
-    pub handled: FnvHashMap<L, Box<ShapedBlock<L>>>,
+    pub handled: Vec<HandledBlock<L>>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct HandledBlock<L: RelooperLabel> {
+    pub labels: Vec<L>,
+    pub inner: Box<ShapedBlock<L>>,
 }
 
 // Branch modes
@@ -85,8 +92,9 @@ pub enum BranchMode {
 
 type LoopId = u16;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Node<L> {
+    Start,
     Basic(L),
     Loop(LoopId),
     LoopMulti(LoopId),
@@ -148,6 +156,10 @@ impl<L: RelooperLabel> Relooper<L> {
                 graph.add_edge(nodes[&label], nodes[&branch], Edge::Forward);
             }
         }
+
+        // Mark the start of the graph, to make identifying when the root node is a loop easier
+        let start_node = graph.add_node(Node::Start);
+        graph.add_edge(start_node, nodes[&root], Edge::Forward);
 
         Relooper {
             counter: 0,
@@ -302,10 +314,19 @@ impl<L: RelooperLabel> Relooper<L> {
         }
 
         // Multiples
-        let mut handled = FnvHashMap::default();
+        let mut handled = Vec::default();
         for entry in entries {
-            handled.insert(self.get_basic_node_label(entry), self.output(vec![entry]).unwrap());
+            handled.push(HandledBlock {
+                labels: match self.graph[entry] {
+                    Node::Basic(label) => vec![label],
+                    Node::Loop(_) | Node::LoopMulti(_) => Vec::from_iter(self.graph.neighbors(entry).map(|n| self.get_basic_node_label(n))),
+                    _ => unimplemented!(),
+                },
+                inner: self.output(vec![entry]).unwrap(),
+            });
         }
+        // Sort so that the tests will work
+        handled.sort_by(|a, b| a.labels.cmp(&b.labels));
         Some(Box::new(ShapedBlock::Multiple(MultipleBlock {
             handled,
         })))

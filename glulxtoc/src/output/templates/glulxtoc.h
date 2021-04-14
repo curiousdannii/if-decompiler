@@ -43,6 +43,9 @@ extern void OP_SAVE(glui32 arg0, glui32 next, glui32 storetype, glui32 storeval)
 extern int OP_RESTORE(glui32 arg0, glui32 storetype, glui32 storeval);
 extern void OP_SAVEUNDO(glui32 next, glui32 storetype, glui32 storeval);
 extern int OP_RESTOREUNDO(glui32 storetype, glui32 storeval);
+extern int OP_CALLFI(glui32 addr, glui32 arg0, glui32 storetype, glui32 storeval, glui32 next);
+extern int OP_CALLFII(glui32 addr, glui32 arg0, glui32 arg1, glui32 storetype, glui32 storeval, glui32 next);
+extern int OP_CALLFIII(glui32 addr, glui32 arg0, glui32 arg1, glui32 arg2, glui32 storetype, glui32 storeval, glui32 next);
 extern void OP_MCOPY(glui32 arg0, glui32 arg1, glui32 arg2);
 extern glsi32 OP_FTONUMZ(glui32 arg0);
 extern glsi32 OP_FTONUMN(glui32 arg0);

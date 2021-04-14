@@ -29,10 +29,12 @@ impl GlulxOutput {
 #include \"glulxe.h\"
 #include \"glulxtoc.h\"
 #include <math.h>
+#include <stdio.h>
 
 void execute_loop(void) {{
     glui32 temp0, temp1;
     while (1) {{
+        //printf(\"execute_loop %d\\n\", pc);
         switch (pc) {{")?;
 
         // Output the function bodies
@@ -176,19 +178,15 @@ void execute_loop(void) {{
         format!("if (VM_CALL_FUNCTION({}, {}, {}, {}, {})) {{break;}}", addr, count, storer_type(instruction.storer), self.storer_value(instruction.storer), instruction.next)
     }
 
-    fn output_callf_unsafe(&self, instruction: &Instruction, mut operands: Vec<String>) -> String {
-        let addr = operands.remove(0);
-        let count = operands.len();
-        let mut inner = Vec::new();
-        if count > 0 {
-            // Push the arguments in reverse order
-            for (i, operand) in operands.iter().enumerate() {
-                inner.push(format!("StkW4(stackptr + {}, {})", (count - i - 1) * 4, operand.clone()));
-            }
-            inner.push(format!("stackptr += {}", count * 4));
-        }
-        inner.push(format!("VM_CALL_FUNCTION({}, {}, {}, {}, {})", addr, count, storer_type(instruction.storer), self.storer_value(instruction.storer), instruction.next));
-        format!("if ({}) {{break;}}", inner.join(", "))
+    fn output_callf_unsafe(&self, instruction: &Instruction, operands: Vec<String>) -> String {
+        let inner = match operands.len() {
+            1 => format!("VM_CALL_FUNCTION({}, 0", operands[0]),
+            2 => format!("OP_CALLFI({}", operands.join(", ")),
+            3 => format!("OP_CALLFII({}", operands.join(", ")),
+            4 => format!("OP_CALLFIII({}", operands.join(", ")),
+            _ => unreachable!(),
+        };
+        format!("if ({}, {}, {}, {})) {{break;}}", inner, storer_type(instruction.storer), self.storer_value(instruction.storer), instruction.next)
     }
 
     fn storer_value(&self, storer: Operand) -> u32 {

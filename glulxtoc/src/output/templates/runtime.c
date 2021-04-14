@@ -309,6 +309,24 @@ int OP_RESTOREUNDO(glui32 storetype, glui32 storeval) {
     }
 }
 
+int OP_CALLFI(glui32 addr, glui32 arg0, glui32 storetype, glui32 storeval, glui32 next) {
+    PushStack(arg0);
+    return VM_CALL_FUNCTION(addr, 1, storetype, storeval, next);
+}
+
+int OP_CALLFII(glui32 addr, glui32 arg0, glui32 arg1, glui32 storetype, glui32 storeval, glui32 next) {
+    PushStack(arg1);
+    PushStack(arg0);
+    return VM_CALL_FUNCTION(addr, 2, storetype, storeval, next);
+}
+
+int OP_CALLFIII(glui32 addr, glui32 arg0, glui32 arg1, glui32 arg2, glui32 storetype, glui32 storeval, glui32 next) {
+    PushStack(arg2);
+    PushStack(arg1);
+    PushStack(arg0);
+    return VM_CALL_FUNCTION(addr, 3, storetype, storeval, next);
+}
+
 void OP_MZERO(glui32 arg0, glui32 arg1) {
     glui32 lx;
     for (lx=0; lx < arg0; lx++, arg1++) {

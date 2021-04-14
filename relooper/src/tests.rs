@@ -9,9 +9,12 @@ https://github.com/curiousdannii/if-decompiler
 
 */
 
+use std::iter::FromIterator;
+
 use maplit::hashmap;
 
 use super::*;
+use BranchMode::*;
 use ShapedBlock::*;
 
 // Basic sequential blocks
@@ -31,10 +34,13 @@ fn test_basic_blocks() {
                 label: 2,
                 immediate: None,
                 next: None,
+                branches: FnvHashMap::default(),
             }))),
             next: None,
+            branches: FnvHashMap::default(),
         }))),
         next: None,
+        branches: FnvHashMap::default(),
     })));
 }
 
@@ -60,13 +66,19 @@ fn test_basic_loops() {
                         label: 3,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::from_iter(vec![
+                            (1, LoopContinue(0)),
+                        ]),
                     }))),
                     next: None,
+                    branches: FnvHashMap::default(),
                 }))),
                 next: None,
+                branches: FnvHashMap::default(),
             })),
         }))),
         next: None,
+        branches: FnvHashMap::default(),
     })));
 
     let blocks = hashmap!{
@@ -93,8 +105,12 @@ fn test_basic_loops() {
                                     label: 3,
                                     immediate: None,
                                     next: None,
+                                    branches: FnvHashMap::from_iter(vec![
+                                        (1, LoopContinue(0)),
+                                    ]),
                                 }))),
                                 next: None,
+                                branches: FnvHashMap::default(),
                             })),
                         },
                         HandledBlock {
@@ -103,14 +119,17 @@ fn test_basic_loops() {
                                 label: 4,
                                 immediate: None,
                                 next: None,
+                                branches: FnvHashMap::default(),
                             })),
                         },
                     ],
                 }))),
                 next: None,
+                branches: FnvHashMap::default(),
             })),
         }))),
         next: None,
+        branches: FnvHashMap::default(),
     })));
 
     let blocks = hashmap!{
@@ -137,6 +156,9 @@ fn test_basic_loops() {
                                     label: 3,
                                     immediate: None,
                                     next: None,
+                                    branches: FnvHashMap::from_iter(vec![
+                                        (1, LoopContinue(0)),
+                                    ]),
                                 })),
                             },
                             HandledBlock {
@@ -145,16 +167,20 @@ fn test_basic_loops() {
                                     label: 4,
                                     immediate: None,
                                     next: None,
+                                    branches: FnvHashMap::default(),
                                 })),
                             },
                         ],
                     }))),
                     next: None,
+                    branches: FnvHashMap::default(),
                 }))),
                 next: None,
+                branches: FnvHashMap::default(),
             })),
         }))),
         next: None,
+        branches: FnvHashMap::default(),
     })));
 
     // Test a self loop
@@ -175,11 +201,15 @@ fn test_basic_loops() {
                             label: 1,
                             immediate: None,
                             next: None,
+                            branches: FnvHashMap::default(),
                         })),
                     },
                 ],
             }))),
             next: None,
+            branches: FnvHashMap::from_iter(vec![
+                (0, LoopContinue(0)),
+            ]),
         })),
     })));
 }
@@ -203,6 +233,7 @@ fn test_basic_ifs() {
                         label: 1,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::default(),
                     })),
                 },
                 HandledBlock {
@@ -211,11 +242,13 @@ fn test_basic_ifs() {
                         label: 2,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::default(),
                     })),
                 },
             ],
         }))),
         next: None,
+        branches: FnvHashMap::default(),
     })));
 
     let blocks = hashmap!{
@@ -235,6 +268,9 @@ fn test_basic_ifs() {
                         label: 1,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::from_iter(vec![
+                            (3, MergedBranch),
+                        ]),
                     })),
                 },
                 HandledBlock {
@@ -243,6 +279,9 @@ fn test_basic_ifs() {
                         label: 2,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::from_iter(vec![
+                            (3, MergedBranch),
+                        ]),
                     })),
                 },
             ],
@@ -251,7 +290,9 @@ fn test_basic_ifs() {
             label: 3,
             immediate: None,
             next: None,
+            branches: FnvHashMap::default(),
         }))),
+        branches: FnvHashMap::default(),
     })));
 
     let blocks = hashmap!{
@@ -270,6 +311,9 @@ fn test_basic_ifs() {
                         label: 1,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::from_iter(vec![
+                            (2, MergedBranch),
+                        ]),
                     })),
                 },
             ],
@@ -278,7 +322,11 @@ fn test_basic_ifs() {
             label: 2,
             immediate: None,
             next: None,
+            branches: FnvHashMap::default(),
         }))),
+        branches: FnvHashMap::from_iter(vec![
+            (2, MergedBranch),
+        ]),
     })));
 }
 
@@ -307,8 +355,13 @@ fn test_nested_loops() {
                                     label: 2,
                                     immediate: None,
                                     next: None,
+                                    branches: FnvHashMap::from_iter(vec![
+                                        (0, LoopContinue(0)),
+                                        (1, LoopContinue(1)),
+                                    ]),
                                 }))),
                                 next: None,
+                                branches: FnvHashMap::default(),
                             })),
                         })),
                     },
@@ -318,11 +371,13 @@ fn test_nested_loops() {
                             label: 3,
                             immediate: None,
                             next: None,
+                            branches: FnvHashMap::default(),
                         })),
                     },
                 ],
             }))),
             next: None,
+            branches: FnvHashMap::default(),
         })),
     })));
 }
@@ -357,6 +412,9 @@ fn test_nested_ifs() {
                                         label: 2,
                                         immediate: None,
                                         next: None,
+                                        branches: FnvHashMap::from_iter(vec![
+                                            (4, MergedBranch),
+                                        ]),
                                     })),
                                 },
                                 HandledBlock {
@@ -365,6 +423,9 @@ fn test_nested_ifs() {
                                         label: 3,
                                         immediate: None,
                                         next: None,
+                                        branches: FnvHashMap::from_iter(vec![
+                                            (4, MergedBranch),
+                                        ]),
                                     })),
                                 },
                             ],
@@ -373,7 +434,11 @@ fn test_nested_ifs() {
                             label: 4,
                             immediate: None,
                             next: None,
+                            branches: FnvHashMap::from_iter(vec![
+                                (8, MergedBranch),
+                            ]),
                         }))),
+                        branches: FnvHashMap::default(),
                     })),
                 },
                 HandledBlock {
@@ -388,6 +453,9 @@ fn test_nested_ifs() {
                                         label: 6,
                                         immediate: None,
                                         next: None,
+                                        branches: FnvHashMap::from_iter(vec![
+                                            (8, MergedBranch),
+                                        ]),
                                     })),
                                 },
                                 HandledBlock {
@@ -396,11 +464,15 @@ fn test_nested_ifs() {
                                         label: 7,
                                         immediate: None,
                                         next: None,
+                                        branches: FnvHashMap::from_iter(vec![
+                                            (8, MergedBranch),
+                                        ]),
                                     })),
                                 },
                             ],
                         }))),
                         next: None,
+                        branches: FnvHashMap::default(),
                     })),
                 }
             ],
@@ -409,7 +481,9 @@ fn test_nested_ifs() {
             label: 8,
             immediate: None,
             next: None,
+            branches: FnvHashMap::default(),
         }))),
+        branches: FnvHashMap::default(),
     })));
 }
 
@@ -433,6 +507,9 @@ fn test_loop_in_branch() {
                         label: 1,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::from_iter(vec![
+                            (4, MergedBranch),
+                        ]),
                     })),
                 },
                 HandledBlock {
@@ -445,8 +522,13 @@ fn test_loop_in_branch() {
                                 label: 3,
                                 immediate: None,
                                 next: None,
+                                branches: FnvHashMap::from_iter(vec![
+                                    (2, LoopContinue(0)),
+                                    (4, LoopBreak(0)),
+                                ]),
                             }))),
                             next: None,
+                            branches: FnvHashMap::default(),
                         })),
                     })),
                 },
@@ -456,7 +538,9 @@ fn test_loop_in_branch() {
             label: 4,
             immediate: None,
             next: None,
+            branches: FnvHashMap::default(),
         }))),
+        branches: FnvHashMap::default(),
     })));
 }
 
@@ -490,6 +574,9 @@ fn test_spaghetti() {
                                         label: 3,
                                         immediate: None,
                                         next: None,
+                                        branches: FnvHashMap::from_iter(vec![
+                                            (8, MergedBranchIntoMulti),
+                                        ]),
                                     })),
                                 },
                                 HandledBlock {
@@ -498,11 +585,15 @@ fn test_spaghetti() {
                                         label: 4,
                                         immediate: None,
                                         next: None,
+                                        branches: FnvHashMap::from_iter(vec![
+                                            (7, MergedBranchIntoMulti),
+                                        ]),
                                     })),
                                 },
                             ],
                         }))),
                         next: None,
+                        branches: FnvHashMap::default(),
                     })),
                 },
                 HandledBlock {
@@ -517,6 +608,9 @@ fn test_spaghetti() {
                                         label: 5,
                                         immediate: None,
                                         next: None,
+                                        branches: FnvHashMap::from_iter(vec![
+                                            (7, MergedBranchIntoMulti),
+                                        ]),
                                     })),
                                 },
                                 HandledBlock {
@@ -525,11 +619,15 @@ fn test_spaghetti() {
                                         label: 6,
                                         immediate: None,
                                         next: None,
+                                        branches: FnvHashMap::from_iter(vec![
+                                            (8, MergedBranchIntoMulti),
+                                        ]),
                                     })),
                                 },
                             ],
                         }))),
                         next: None,
+                        branches: FnvHashMap::default(),
                     })),
                 },
             ],
@@ -542,6 +640,7 @@ fn test_spaghetti() {
                         label: 7,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::default(),
                     })),
                 },
                 HandledBlock {
@@ -550,10 +649,12 @@ fn test_spaghetti() {
                         label: 8,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::default(),
                     })),
                 },
             ],
         }))),
+        branches: FnvHashMap::default(),
     })));
 
     let blocks = hashmap!{
@@ -577,6 +678,9 @@ fn test_spaghetti() {
                         label: 1,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::from_iter(vec![
+                            (6, MergedBranchIntoMulti),
+                        ]),
                     })),
                 },
                 HandledBlock {
@@ -593,6 +697,10 @@ fn test_spaghetti() {
                                             label: 4,
                                             immediate: None,
                                             next: None,
+                                            branches: FnvHashMap::from_iter(vec![
+                                                (2, LoopContinue(0)),
+                                                (6, LoopBreakIntoMultiple(0)),
+                                            ]),
                                         })),
                                     },
                                     HandledBlock {
@@ -601,11 +709,16 @@ fn test_spaghetti() {
                                             label: 5,
                                             immediate: None,
                                             next: None,
+                                            branches: FnvHashMap::from_iter(vec![
+                                                (2, LoopContinue(0)),
+                                                (7, LoopBreakIntoMultiple(0)),
+                                            ]),
                                         })),
                                     },
                                 ],
                             }))),
                             next: None,
+                            branches: FnvHashMap::default(),
                         })),
                     })),
                 },
@@ -615,6 +728,9 @@ fn test_spaghetti() {
                         label: 3,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::from_iter(vec![
+                            (7, MergedBranchIntoMulti),
+                        ]),
                     })),
                 },
             ],
@@ -627,6 +743,7 @@ fn test_spaghetti() {
                         label: 6,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::default(),
                     })),
                 },
                 HandledBlock {
@@ -635,10 +752,12 @@ fn test_spaghetti() {
                         label: 7,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::default(),
                     })),
                 },
             ],
         }))),
+        branches: FnvHashMap::default(),
     })));
 }
 
@@ -673,11 +792,18 @@ fn test_stackifier_multiloop() {
                                         label: 'D',
                                         immediate: None,
                                         next: None,
+                                        branches: FnvHashMap::from_iter(vec![
+                                            ('B', LoopContinueMulti(0)),
+                                            ('C', LoopContinueMulti(0)),
+                                        ]),
                                     })),
                                 },
                             ],
                         }))),
                         next: None,
+                        branches: FnvHashMap::from_iter(vec![
+                            ('E', MergedBranch),
+                        ]),
                     })),
                 },
                 HandledBlock {
@@ -686,6 +812,9 @@ fn test_stackifier_multiloop() {
                         label: 'C',
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::from_iter(vec![
+                            ('E', MergedBranch),
+                        ]),
                     })),
                 },
             ],
@@ -699,6 +828,9 @@ fn test_stackifier_multiloop() {
                                 label: 'F',
                                 immediate: None,
                                 next: None,
+                                branches: FnvHashMap::from_iter(vec![
+                                    ('G', MergedBranch),
+                                ]),
                             })),
                         },
                     ],
@@ -713,18 +845,27 @@ fn test_stackifier_multiloop() {
                                     label: 'H',
                                     immediate: None,
                                     next: None,
+                                    branches: FnvHashMap::default(),
                                 })),
                             },
                         ],
                     }))),
                     next: None,
+                    branches: FnvHashMap::from_iter(vec![
+                        ('B', LoopContinueMulti(0)),
+                    ]),
                 }))),
+                branches: FnvHashMap::from_iter(vec![
+                    ('G', MergedBranch),
+                ]),
             }))),
         }))),
         next: None,
+        branches: FnvHashMap::default(),
     })));
 }
 
+// Test a LoopMulti with a top triple branch
 #[test]
 fn test_loopmulti() {
     let blocks = hashmap!{
@@ -745,6 +886,7 @@ fn test_loopmulti() {
                         label: 2,
                         immediate: None,
                         next: None,
+                        branches: FnvHashMap::default(),
                     })),
                 },
                 HandledBlock {
@@ -758,6 +900,9 @@ fn test_loopmulti() {
                                     label: 3,
                                     immediate: None,
                                     next: None,
+                                    branches: FnvHashMap::from_iter(vec![
+                                        (4, LoopContinueMulti(0)),
+                                    ]),
                                 })),
                             },
                             HandledBlock {
@@ -768,8 +913,12 @@ fn test_loopmulti() {
                                         label: 5,
                                         immediate: None,
                                         next: None,
+                                        branches: FnvHashMap::from_iter(vec![
+                                            (3, LoopContinueMulti(0)),
+                                        ]),
                                     }))),
                                     next: None,
+                                    branches: FnvHashMap::default(),
                                 })),
                             },
                         ],
@@ -779,5 +928,6 @@ fn test_loopmulti() {
             ],
         }))),
         next: None,
+        branches: FnvHashMap::default(),
     })));
 }

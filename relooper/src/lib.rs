@@ -113,10 +113,10 @@ enum Node<L> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum Edge<L> {
+enum Edge {
     // Edges that form the acyclic CFG
     Forward,
-    ForwardMulti(L),
+    ForwardMulti,
     Next,
     // Edges that will be filtered out when traversing the graph
     LoopBreak(LoopId),
@@ -128,10 +128,10 @@ enum Edge<L> {
     Removed,
 }
 
-fn filter_edges<L>(edge: petgraph::graph::EdgeReference<Edge<L>>) -> bool {
+fn filter_edges(edge: petgraph::graph::EdgeReference<Edge>) -> bool {
     use Edge::*;
     match edge.weight() {
-        Forward | ForwardMulti(_) | Next => true,
+        Forward | ForwardMulti | Next => true,
         _ => false,
     }
 }
@@ -139,7 +139,7 @@ fn filter_edges<L>(edge: petgraph::graph::EdgeReference<Edge<L>>) -> bool {
 // The Relooper algorithm
 struct Relooper<L: RelooperLabel> {
     counter: u16,
-    graph: Graph<Node<L>, Edge<L>>,
+    graph: Graph<Node<L>, Edge>,
     root: NodeIndex,
 }
 
@@ -225,8 +225,7 @@ impl<L: RelooperLabel> Relooper<L> {
 
                 // Replace the incoming edges
                 for edge in edges {
-                    let target_label = self.get_basic_node_label(edge.2);
-                    self.graph.add_edge(edge.1, loop_node, if multi_loop { Edge::ForwardMulti(target_label) } else { Edge::Forward });
+                    self.graph.add_edge(edge.1, loop_node, if multi_loop { Edge::ForwardMulti } else { Edge::Forward });
                     // Cannot remove edges without potentially breaking other edge indexes, so mark them as removed for now
                     self.graph[edge.0] = Edge::Removed;
                 }
@@ -381,7 +380,7 @@ impl<L: RelooperLabel> Relooper<L> {
                 all_entries.insert(target);
                 let mut add_branch = |target, branch| outgoing_branches.insert(self.get_basic_node_label(target), branch);
                 match edge.weight() {
-                    Edge::Forward | Edge::ForwardMulti(_) => { immediate_entries.insert(target); },
+                    Edge::Forward | Edge::ForwardMulti => { immediate_entries.insert(target); },
                     Edge::Next => { next_entries.insert(target); },
                     Edge::LoopBreak(loop_id) => { add_branch(target, BranchMode::LoopBreak(*loop_id)); },
                     Edge::LoopBreakIntoMultiple(loop_id) => { add_branch(target, BranchMode::LoopBreakIntoMultiple(*loop_id)); },

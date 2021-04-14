@@ -50,6 +50,10 @@ impl GlulxOutput {
         let mut safe_funcs: FnvHashMap<u32, Vec<u32>> = FnvHashMap::default();
         let mut highest_arg_count = 0;
         for (addr, function) in &self.state.functions {
+            if self.disassemble_mode {
+                break;
+            }
+
             if function.safety == FunctionSafety::Unsafe {
                 continue;
             }
@@ -223,16 +227,16 @@ impl GlulxOutput {
         }
         use Operand::*;
         let func = match opcode {
-            OP_COPYS => "MemW2",
-            OP_COPYB => "MemW1",
-            _ => "MemW4",
+            OP_COPYS => "store_operand_s(1",
+            OP_COPYB => "store_operand_b(1",
+            _ => "store_operand(1",
         };
         match storer {
             Constant(_) => inner, // Must still output the inner code in case there are side-effects
-            Memory(addr) => format!("{}({}, {})", func, addr, inner),
+            Memory(addr) => format!("{}, {}, {})", func, addr, inner),
             Stack => format!("PushStack({})", inner),
             Local(val) => format!("l{} = {}", val / 4, inner),
-            RAM(addr) => format!("{}({}, {})", func, addr + self.ramstart, inner),
+            RAM(addr) => format!("{}, {}, {})", func, addr + self.ramstart, inner),
         }
     }
 
@@ -241,10 +245,10 @@ impl GlulxOutput {
         let store = |storer: Operand, i: u32| {
             match storer {
                 Constant(_) => String::from("NULL"),
-                Memory(addr) => format!("MemW4({}, temp{})", addr, i),
+                Memory(addr) => format!("store_operand(1, {}, temp{})", addr, i),
                 Stack => format!("PushStack(temp{})", i),
                 Local(val) => format!("l{} = temp{}", val / 4, i),
-                RAM(addr) => format!("MemW4({}, temp{})", addr + self.ramstart, i),
+                RAM(addr) => format!("store_operand(1, {}, temp{})", addr + self.ramstart, i),
             }
         };
         format!("{}; {}; {}", inner, store(instruction.storer, 0), store(instruction.storer2, 1))

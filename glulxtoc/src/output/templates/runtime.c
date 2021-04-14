@@ -441,17 +441,20 @@ int VM_BRANCH(glui32 offset, glui32 next) {
     return 0;
 }
 
-int VM_CALL_FUNCTION(glui32 addr, glui32 count, glui32 storetype, glui32 storeval) {
+int VM_CALL_FUNCTION(glui32 addr, glui32 count, glui32 storetype, glui32 storeval, glui32 next) {
     glui32 *arglist;
-    if (!VM_FUNC_IS_SAFE(addr)) {
+    if (VM_FUNC_IS_SAFE(addr)) {
+        glui32 result = VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(addr, count);
+        store_operand(storetype, storeval, result);
+        return 0;
+    }
+    else {
         arglist = pop_arguments(count, 0);
+        pc = next;
         push_callstub(storetype, storeval);
         enter_function(addr, count, arglist);
         return 1;
     }
-    glui32 result = VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(addr, count);
-    store_operand(storetype, storeval, result);
-    return 0;
 }
 
 // Try to recover from an invalid unsafe PC by seeing if we can call a safe function
@@ -472,17 +475,17 @@ int VM_JUMP_CALL(glui32 pc) {
 }
 
 void VM_TAILCALL_FUNCTION(glui32 addr, glui32 count) {
-    if (!VM_FUNC_IS_SAFE(addr)) {
-        glui32 *arglist;
-        arglist = pop_arguments(count, 0);
-        leave_function();
-        enter_function(addr, count, arglist);
-    }
-    else {
+    if (VM_FUNC_IS_SAFE(addr)) {
         glui32 result = VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(addr, count);
         leave_function();
         if (stackptr != 0) {
             pop_callstub(result);
         }
+    }
+    else {
+        glui32 *arglist;
+        arglist = pop_arguments(count, 0);
+        leave_function();
+        enter_function(addr, count, arglist);
     }
 }

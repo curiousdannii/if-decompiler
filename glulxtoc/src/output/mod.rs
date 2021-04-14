@@ -22,6 +22,7 @@ mod image;
 mod templates;
 
 pub struct GlulxOutput {
+    pub disassemble_mode: bool,
     pub name: String,
     pub out_dir: PathBuf,
     pub ramstart: u32,

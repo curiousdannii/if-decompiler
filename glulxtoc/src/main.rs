@@ -28,6 +28,10 @@ struct Cli {
     /// Output folder
     #[structopt(parse(from_os_str))]
     out_dir: Option<PathBuf>,
+
+    /// Disassembler mode - only disassemble, do not optimise or generate structured code
+    #[structopt(short, long)]
+    disassemble: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -69,6 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Output the C files
     let ramstart = decompiler.read_addr(8);
     let output = output::GlulxOutput {
+        disassemble_mode: args.disassemble,
         name,
         out_dir,
         ramstart,

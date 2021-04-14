@@ -236,6 +236,10 @@ impl GlulxState {
                 if let Operand::Constant(callee_addr) = instruction.operands[0] {
                     graph.edges.insert((addr, callee_addr));
                 }
+                // And if it isn't a tailcall, then add an entry point
+                if opcode != opcodes::OP_TAILCALL {
+                    entry_points.insert(instruction.next);
+                }
             }
 
             instructions.push(instruction);

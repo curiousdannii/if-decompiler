@@ -136,37 +136,40 @@ impl GlulxOutput {
         }
 
         // Run the relooper
-        let block = reloop(input_blocks, *function.blocks.iter().next().unwrap().0);
-        self.output_shaped_block(function, &*block, 1)
+        let mut block = reloop(input_blocks, *function.blocks.iter().next().unwrap().0);
+        self.output_shaped_block(function, &mut *block, 1)
     }
 
     // Output a shaped block
-    fn output_shaped_block(&self, function: &Function, shaped_block: &ShapedBlock<u32>, indents: usize) -> String {
+    fn output_shaped_block(&self, function: &Function, shaped_block: &mut ShapedBlock<u32>, indents: usize) -> String {
         let indent = "    ".repeat(indents);
         let mut output = String::new();
         match shaped_block {
             Simple(block) => {
                 let basicblock = function.blocks.get(&block.label).unwrap();
                 for instruction in &basicblock.code {
-                    output.push_str(&format!("{}/* {:>3X}/{} */ {}\n", indent, instruction.opcode, instruction.addr, self.output_instruction_safe(&function, &block, &instruction, indents)));
+                    output.push_str(&format!("{}/* {:>3X}/{} */ {}\n", indent, instruction.opcode, instruction.addr, self.output_instruction_safe(&function, block, &instruction, indents)));
                 }
-                if let Some(next) = block.next.as_deref() {
+                if let Some(immediate) = block.immediate.as_deref_mut() {
+                    output.push_str(&self.output_shaped_block(function, immediate, indents));
+                }
+                if let Some(next) = block.next.as_deref_mut() {
                     output.push_str(&self.output_shaped_block(function, next, indents));
                 }
             },
             Loop(block) => {
                 output.push_str(&format!("{}while (1) {{\n{}    loop_{}_continue:\n", indent, indent, block.loop_id));
-                output.push_str(&self.output_shaped_block(function, &block.inner, indents + 1));
+                output.push_str(&self.output_shaped_block(function, &mut *block.inner, indents + 1));
                 output.push_str(&format!("{}}}\n{}loop_{}_break:;\n", indent, indent, block.loop_id));
             },
-            LoopMulti(block) => unimplemented!(),
+            LoopMulti(_block) => unimplemented!(),
             Multiple(block) => {
                 output.push_str(&format!("{}switch (label) {{\n", indent));
-                for handled in &block.handled {
+                for handled in block.handled.iter_mut() {
                     for label in &handled.labels {
                         output.push_str(&format!("{}    case {}:\n", indent, label));
                     }
-                    output.push_str(&self.output_shaped_block(function, &handled.inner, indents + 2));
+                    output.push_str(&self.output_shaped_block(function, &mut handled.inner, indents + 2));
                     output.push_str(&format!("{}        break;\n", indent));
                 }
                 output.push_str(&format!("{}}}\n", indent));
@@ -176,7 +179,7 @@ impl GlulxOutput {
     }
 
     // Output an instruction
-    fn output_instruction_safe(&self, function: &Function, block: &GlulxSimpleBlock, instruction: &Instruction, indents: usize) -> String {
+    fn output_instruction_safe(&self, function: &Function, block: &mut GlulxSimpleBlock, instruction: &Instruction, indents: usize) -> String {
         let opcode = instruction.opcode;
         let operands = self.map_operands_safe(instruction);
         let null = String::from("NULL");
@@ -312,7 +315,7 @@ impl GlulxOutput {
         }
     }
 
-    fn output_branch_safe(&self, function: &Function, simple_block: &GlulxSimpleBlock, instruction: &Instruction, condition: String, indents: usize) -> String {
+    fn output_branch_safe(&self, function: &Function, simple_block: &mut GlulxSimpleBlock, instruction: &Instruction, condition: String, indents: usize) -> String {
         use Branch::*;
         use BranchTarget::*;
         use opcodes::*;
@@ -328,21 +331,22 @@ impl GlulxOutput {
                             return format!("if ({}) {{{};}}", condition, output_branchmode(branch_mode, addr))
                         }
                         // Inspect the next block
-                        match simple_block.immediate.as_deref() {
-                            Some(block) => {
-                                match block {
+                        match simple_block.immediate.as_deref_mut() {
+                            Some(immediate_block) => {
+                                match immediate_block {
                                     Simple(_) => panic!("Should not branch directly into a SimpleBlock"),
                                     Loop(_) => panic!("Should not branch directly into a LoopBlock"),
-                                    LoopMulti(block) => {
+                                    LoopMulti(_block) => {
                                         unimplemented!()
                                     },
                                     Multiple(block) => {
-                                        let if_block = find_multiple(&block.handled, addr).unwrap();
-                                        let else_block = find_multiple(&block.handled, instruction.next);
-                                        let mut output = format!("if ({}) {{\n{}{}}}", condition, self.output_shaped_block(function, if_block, indents + 1), indent);
-                                        if let Some(else_block) = else_block {
-                                            output.push_str(&format!("\n{}else {{\n{}{}}}", indent, self.output_shaped_block(function, else_block, indents + 1), indent));
+                                        let mut if_block = find_multiple(&mut block.handled, addr).unwrap();
+                                        let mut output = format!("if ({}) {{\n{}{}}}", condition, self.output_shaped_block(function, &mut if_block, indents + 1), indent);
+                                        let else_block_option = find_multiple(&mut block.handled, instruction.next);
+                                        if let Some(mut else_block) = else_block_option {
+                                            output.push_str(&format!("\n{}else {{\n{}{}}}", indent, self.output_shaped_block(function, &mut else_block, indents + 1), indent));
                                         }
+                                        simple_block.immediate = None;
                                         return output
                                     }
                                 }
@@ -363,21 +367,26 @@ impl GlulxOutput {
                                 return format!("{};", output_branchmode(branch_mode, addr))
                             }
                             // Inspect the next block
-                            match simple_block.immediate.as_deref() {
-                                Some(block) => {
-                                    match block {
-                                        Simple(_) => return format!("/* Jumping into immediate */\n{}", self.output_shaped_block(function, block, indents)),
+                            match simple_block.immediate.as_deref_mut() {
+                                Some(mut immediate_block) => {
+                                    match immediate_block {
+                                        Simple(_) => {
+                                            let output = format!("/* Jumping into immediate */\n{}", self.output_shaped_block(function, &mut immediate_block, indents));
+                                            simple_block.immediate = None;
+                                            return output
+                                        },
                                         Loop(_) => panic!("Should not branch directly into a LoopBlock"),
-                                        LoopMulti(block) => {
+                                        LoopMulti(_block) => {
                                             unimplemented!()
                                         },
                                         Multiple(block) => {
-                                            let if_block = find_multiple(&block.handled, addr).unwrap();
-                                            let else_block = find_multiple(&block.handled, instruction.next);
-                                            let mut output = format!("if ({}) {{\n{}{}}}", condition, self.output_shaped_block(function, if_block, indents + 1), indent);
-                                            if let Some(else_block) = else_block {
-                                                output.push_str(&format!("\n{}else {{\n{}{}}}", indent, self.output_shaped_block(function, else_block, indents + 1), indent));
+                                            let mut if_block = find_multiple(&mut block.handled, addr).unwrap();
+                                            let mut output = format!("if ({}) {{\n{}{}}}", condition, self.output_shaped_block(function, &mut if_block, indents + 1), indent);
+                                            let else_block_option = find_multiple(&mut block.handled, instruction.next);
+                                            if let Some(mut else_block) = else_block_option {
+                                                output.push_str(&format!("\n{}else {{\n{}{}}}", indent, self.output_shaped_block(function, &mut else_block, indents + 1), indent));
                                             }
+                                            simple_block.immediate = None;
                                             return output
                                         }
                                     }
@@ -396,10 +405,10 @@ impl GlulxOutput {
     }
 }
 
-fn find_multiple(handled: &Vec<HandledBlock<u32>>, label: u32) -> Option<&ShapedBlock<u32>> {
-    for block in handled {
+fn find_multiple(handled: &mut Vec<HandledBlock<u32>>, label: u32) -> Option<&mut ShapedBlock<u32>> {
+    for block in handled.iter_mut() {
         if block.labels.contains(&label) {
-            return Some(&*block.inner)
+            return Some(&mut *block.inner)
         }
     }
     None
@@ -424,7 +433,7 @@ fn output_branchmode(branch_mode: &BranchMode, addr: u32) -> String {
         LoopBreakIntoMultiple(loop_id) => format!("label = {}; goto loop_{}_break", addr, loop_id),
         LoopContinue(loop_id) => format!("goto loop_{}_continue", loop_id),
         LoopContinueMulti(loop_id) => format!("label = {}; goto loop_{}_continue", addr, loop_id),
-        MergedBranch => String::from("/* Branch continues below */"),
-        MergedBranchIntoMulti => format!("label = {}", addr),
+        MergedBranch => format!("/* Branch to {} continues below */", addr),
+        MergedBranchIntoMulti => format!("label = {} /* Branch continues below */", addr),
     }
 }

@@ -41,7 +41,7 @@ impl GlulxOutput {
             OP_SHIFTL => self.runtime("OP_SHIFTL", args),
             OP_USHIFTR => self.runtime("OP_USHIFTR", args),
             OP_SSHIFTR => self.runtime("OP_SSHIFTR", args),
-            // OP_JUMP
+            OP_JUMP => String::new(),
             OP_JZ => format!("{} == 0", op_a),
             OP_JNZ => format!("{} != 0", op_a),
             OP_JEQ => format!("{} == {}", op_a, op_b),
@@ -81,7 +81,7 @@ impl GlulxOutput {
             OP_STREAMUNICHAR => format!("(*stream_unichar_handler)({})", op_a),
             OP_GESTALT => self.runtime("do_gestalt", args),
             OP_DEBUGTRAP => format!("fatal_error_i(\"user debugtrap encountered.\", {})", op_a),
-            // OP_JUMPABS
+            OP_JUMPABS => String::new(),
             // OP_CALLF ..= OP_CALLFIII
             OP_GETMEMSIZE => String::from("endmem"),
             OP_SETMEMSIZE => format!("change_memsize({}, 0)", op_a),
@@ -138,7 +138,7 @@ impl GlulxOutput {
             OP_JFGT => format!("decode_float({}) > decode_float({})", op_a, op_b),
             OP_JFLE => format!("decode_float({}) <= decode_float({})", op_a, op_b),
             OP_JFGE => format!("decode_float({}) >= decode_float({})", op_a, op_b),
-            _ => null, // TODO panic here
+            _ => panic!("Unknown opcode {:>3X} at address {}", opcode, instruction.addr),
         }
     }
 

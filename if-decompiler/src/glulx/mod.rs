@@ -56,13 +56,11 @@ impl VirtualMachine for GlulxState {
 
 pub struct Function {
     pub addr: u32,
-    pub blocks: Vec<GlulxBasicBlock>,
+    pub blocks: BTreeMap<u32, BasicBlock<Instruction>>,
     pub graph_node: graph::NodeIndex,
     pub locals: u32,
     pub safety: FunctionSafety,
 }
-
-type GlulxBasicBlock = BasicBlock<Instruction>;
 
 pub struct Instruction {
     pub addr: u32,

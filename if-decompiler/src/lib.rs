@@ -11,6 +11,8 @@ https://github.com/curiousdannii/if-decompiler
 
 #![forbid(unsafe_code)]
 
+use std::collections::BTreeMap;
+
 use fnv::{FnvHashMap, FnvHashSet};
 use petgraph::{graph, visit};
 
@@ -70,15 +72,15 @@ pub struct BasicBlock<I> {
 }
 
 // Calculate basic blocks
-// If we need to return a map, use BTreeMap so it can remain sorted
-pub fn calculate_basic_blocks<I: VMInstruction>(instructions: Vec<I>, entry_points: FnvHashSet<u32>, exit_branches: FnvHashMap<u32, Vec<u32>>) -> Vec<BasicBlock<I>> {
-    let mut blocks: Vec<BasicBlock<I>> = Vec::new();
-    let mut has_started_block = false;
+pub fn calculate_basic_blocks<I: VMInstruction>(instructions: Vec<I>, entry_points: FnvHashSet<u32>, exit_branches: FnvHashMap<u32, Vec<u32>>) -> BTreeMap<u32, BasicBlock<I>> {
+    let mut blocks: BTreeMap<u32, BasicBlock<I>> = BTreeMap::new();
+    let mut current_block_addr = 0;
     let mut last_instruction_halted = false;
     for instruction in instructions {
         let addr = instruction.addr();
-        if has_started_block {
-            let current_block = blocks.last_mut().unwrap();
+        // If we're in the middle of a block, see if we should add to it
+        if current_block_addr > 0 {
+            let current_block = blocks.get_mut(&current_block_addr).unwrap();
             // Finish a previous block because this one starts a new one
             if entry_points.contains(&addr) {
                 // Unless the last instruction halted, add this new instruction as a branch to the last block
@@ -93,7 +95,7 @@ pub fn calculate_basic_blocks<I: VMInstruction>(instructions: Vec<I>, entry_poin
                     for branch in branches {
                         current_block.branches.insert(*branch);
                     }
-                    has_started_block = false;
+                    current_block_addr = 0;
                 }
                 // Add to the current block
                 last_instruction_halted = instruction.does_halt();
@@ -103,7 +105,7 @@ pub fn calculate_basic_blocks<I: VMInstruction>(instructions: Vec<I>, entry_poin
             }
         }
         // Make a new block
-        has_started_block = true;
+        current_block_addr = addr;
         last_instruction_halted = instruction.does_halt();
         let mut current_block = BasicBlock::<I> {
             label: addr,
@@ -116,7 +118,7 @@ pub fn calculate_basic_blocks<I: VMInstruction>(instructions: Vec<I>, entry_poin
                 current_block.branches.insert(*branch);
             }
         }
-        blocks.push(current_block);
+        blocks.insert(addr, current_block);
     }
     blocks
 }

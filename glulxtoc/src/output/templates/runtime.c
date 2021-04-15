@@ -163,12 +163,12 @@ void OP_ASTOREBIT(glui32 arg0, glui32 arg1, glui32 arg2) {
 }
 
 glui32 OP_STKPEEK(glui32 arg0) {
-    arg0 = arg0 * 4;
-    if (arg0 < 0 || arg0 >= (stackptr - valstackbase))
+    glsi32 vals0 = arg0 * 4;
+    if (vals0 < 0 || vals0 >= (stackptr - valstackbase))
     {
         fatal_error("Stkpeek outside current stack range.");
     }
-    return Stk4(stackptr - (arg0 + 4));
+    return Stk4(stackptr - (vals0 + 4));
 }
 
 void OP_STKSWAP(void) {
@@ -454,19 +454,19 @@ int VM_BRANCH(glui32 offset, glui32 next) {
         }
         pop_callstub(offset);
     } else {
-        pc = next + (glsi32) offset - 2;
+        pc = next + offset - 2;
     }
     return 0;
 }
 
 int VM_CALL_FUNCTION(glui32 addr, glui32 count, glui32 storetype, glui32 storeval, glui32 next) {
-    glui32 *arglist;
     if (VM_FUNC_IS_SAFE(addr)) {
         glui32 result = VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(addr, count);
         store_operand(storetype, storeval, result);
         return 0;
     }
     else {
+        glui32 *arglist;
         arglist = pop_arguments(count, 0);
         pc = next;
         push_callstub(storetype, storeval);
@@ -482,7 +482,7 @@ int VM_JUMP_CALL(glui32 pc) {
         glui32 locals = valstackbase - localsbase;
         glui32 count = locals / 4;
         // Push the locals in reverse order
-        while (locals > valstackbase) {
+        while (locals > localsbase) {
             locals -= 4;
             PushStack(ReadLocal(locals));
         }

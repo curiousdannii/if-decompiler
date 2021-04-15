@@ -14,6 +14,7 @@ use std::time::Instant;
 
 use if_decompiler::*;
 use glulx::*;
+use Operand::*;
 use glulx::opcodes;
 
 use super::*;
@@ -82,6 +83,8 @@ void execute_loop(void) {{
             OP_TAILCALL => format!("VM_TAILCALL_FUNCTION({}, {}); if (stackptr == 0) {{return;}} break", op_a, op_b),
             OP_CATCH => format!("OP_CATCH({}, {}, {})", instruction.next, storer_type(instruction.storer), self.storer_value(instruction.storer)),
             OP_THROW => format!("temp0 = {}; stackptr = {}; pop_callstub(temp0); break", op_a, op_b),
+            OP_COPYS => self.output_copys_unsafe(instruction),
+            OP_COPYB => self.output_copyb_unsafe(instruction),
             OP_CALLF ..= OP_CALLFIII => self.output_callf_unsafe(instruction, operands),
             OP_GETIOSYS => self.output_double_storer_unsafe(instruction, String::from("stream_get_iosys(&temp0, &temp1)")),
             OP_RESTART => String::from("vm_restart(); break"),
@@ -91,7 +94,7 @@ void execute_loop(void) {{
             OP_RESTOREUNDO => format!("if (OP_RESTOREUNDO({}, {})) {{break;}}", storer_type(instruction.storer), self.storer_value(instruction.storer)),
             OP_QUIT => String::from("return"),
             OP_FMOD => self.output_double_storer_unsafe(instruction, format!("OP_FMOD({}, {}, &temp0, &temp1)", op_a, op_b)),
-            _ => self.output_storer_unsafe(opcode, instruction.storer, self.output_common_instruction(instruction, operands)),
+            _ => self.output_storer_unsafe(instruction.storer, self.output_common_instruction(instruction, operands)),
         };
         self.output_branch_unsafe(instruction, body)
     }
@@ -102,7 +105,6 @@ void execute_loop(void) {{
     }
 
     fn output_operand_unsafe(&self, operand: Operand) -> String {
-        use Operand::*;
         match operand {
             Constant(val) => val.to_string(),
             Memory(addr) => format!("Mem4({})", addr),
@@ -112,24 +114,17 @@ void execute_loop(void) {{
         }
     }
 
-    fn output_storer_unsafe(&self, opcode: u32, storer: Operand, inner: String) -> String {
-        use Operand::*;
-        let func = match opcode {
-            opcodes::OP_COPYS => "store_operand_s(1",
-            opcodes::OP_COPYB => "store_operand_b(1",
-            _ => "store_operand(1",
-        };
+    fn output_storer_unsafe(&self, storer: Operand, inner: String) -> String {
         match storer {
             Constant(_) => inner, // Must still output the inner code in case there are side-effects
-            Memory(addr) => format!("{}, {}, {})", func, addr, inner),
+            Memory(addr) => format!("store_operand(1, {}, {})", addr, inner),
             Stack => format!("PushStack({})", inner),
             Local(addr) => format!("store_operand(2, {}, {})", addr, inner),
-            RAM(addr) => format!("{}, {}, {})", func, addr + self.ramstart, inner),
+            RAM(addr) => format!("store_operand(1, {}, {})", addr + self.ramstart, inner),
         }
     }
 
     fn output_double_storer_unsafe(&self, instruction: &Instruction, inner: String) -> String {
-        use Operand::*;
         let store = |storer: Operand, i: u32| {
             match storer {
                 Constant(_) => String::from("NULL"),
@@ -170,7 +165,7 @@ void execute_loop(void) {{
         match branch {
             Dynamic => format!("if (VM_BRANCH({}, {})) {{return;}}", self.output_operand_unsafe(*instruction.operands.last().unwrap()), instruction.next),
             Absolute(addr) => format!("pc = {}", addr),
-            Return(val) => format!("leave_function(); if (stackptr == 0) {{return;}} pop_callstub({})", val),
+            Return(val) => format!("temp0 = {}; leave_function(); if (stackptr == 0) {{return;}} pop_callstub(temp0)", val),
         }
     }
 
@@ -189,8 +184,41 @@ void execute_loop(void) {{
         format!("if ({}, {}, {}, {})) {{break;}}", inner, storer_type(instruction.storer), self.storer_value(instruction.storer), instruction.next)
     }
 
+    fn output_copys_unsafe(&self, instruction: &Instruction) -> String {
+        let inner = match instruction.operands[0] {
+            Constant(val) => format!("{} & 0xFFFF", val),
+            Memory(addr) => format!("Mem2({})", addr),
+            Stack => String::from("PopStack() & 0xFFFF"),
+            Local(addr) => format!("Stk2({} + localsbase)", addr),
+            RAM(addr) => format!("Mem2({})", addr + self.ramstart),
+        };
+        match instruction.operands[1] {
+            Constant(_) => inner,
+            Memory(addr) => format!("store_operand_s(1, {}, {})", addr, inner),
+            Stack => format!("PushStack({})", inner),
+            Local(addr) => format!("store_operand_s(2, {}, {})", addr, inner),
+            RAM(addr) => format!("store_operand_s(1, {}, {})", addr + self.ramstart, inner),
+        }
+    }
+
+    fn output_copyb_unsafe(&self, instruction: &Instruction) -> String {
+        let inner = match instruction.operands[0] {
+            Constant(val) => format!("{} & 0xFF", val),
+            Memory(addr) => format!("Mem1({})", addr),
+            Stack => String::from("PopStack() & 0xFF"),
+            Local(addr) => format!("Stk1({} + localsbase)", addr),
+            RAM(addr) => format!("Mem1({})", addr + self.ramstart),
+        };
+        match instruction.operands[1] {
+            Constant(_) => inner,
+            Memory(addr) => format!("store_operand_b(1, {}, {})", addr, inner),
+            Stack => format!("PushStack({})", inner),
+            Local(addr) => format!("store_operand_b(2, {}, {})", addr, inner),
+            RAM(addr) => format!("store_operand_b(1, {}, {})", addr + self.ramstart, inner),
+        }
+    }
+
     fn storer_value(&self, storer: Operand) -> u32 {
-        use Operand::*;
         match storer {
             Constant(_) | Stack => 0,
             Memory(val) | Local(val) => val,
@@ -200,7 +228,6 @@ void execute_loop(void) {{
 }
 
 fn storer_type(storer: Operand) -> u32 {
-    use Operand::*;
     match storer {
         Constant(_) => 0,
         Memory(_) | RAM(_) => 1,

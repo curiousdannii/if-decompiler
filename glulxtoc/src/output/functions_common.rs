@@ -59,7 +59,8 @@ impl GlulxOutput {
             // OP_TAILCALL
             // OP_CATCH
             // OP_THROW
-            OP_COPY | OP_COPYS | OP_COPYB => op_a.clone(),
+            OP_COPY => op_a.clone(),
+            // OP_COPYS | OP_COPYB
             OP_SEXS => self.runtime("OP_SEXS", args),
             OP_SEXB => self.runtime("OP_SEXB", args),
             OP_ALOAD => format!("Mem4({} + 4 * {})", op_a, op_b),

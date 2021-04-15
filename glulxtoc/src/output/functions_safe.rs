@@ -16,6 +16,7 @@ use fnv::FnvHashMap;
 
 use if_decompiler::*;
 use glulx::*;
+use Operand::*;
 use glulx::opcodes;
 use relooper::*;
 use BranchMode::*;
@@ -194,6 +195,8 @@ impl GlulxOutput {
             OP_CALL => self.output_call_on_stack_safe(instruction, op_a, op_b),
             OP_RETURN => format!("return {}", op_a),
             OP_TAILCALL => format!("return {}", self.output_call_on_stack_safe(instruction, op_a, op_b)),
+            OP_COPYS => self.output_copys_safe(instruction),
+            OP_COPYB => self.output_copyb_safe(instruction),
             OP_CALLF ..= OP_CALLFIII => self.output_callf_safe(instruction, operands),
             OP_GETIOSYS => self.output_double_storer_safe(instruction, String::from("stream_get_iosys(&temp0, &temp1)")),
             OP_FMOD => self.output_double_storer_safe(instruction, format!("OP_FMOD({}, {}, &temp0, &temp1)", op_a, op_b)),
@@ -209,7 +212,6 @@ impl GlulxOutput {
     }
 
     fn output_operand_safe(&self, operand: Operand) -> String {
-        use Operand::*;
         match operand {
             Constant(val) => val.to_string(),
             Memory(addr) => format!("Mem4({})", addr),
@@ -225,23 +227,16 @@ impl GlulxOutput {
         if opcode == OP_GETIOSYS || opcode == OP_FMOD {
             return inner;
         }
-        use Operand::*;
-        let func = match opcode {
-            OP_COPYS => "store_operand_s(1",
-            OP_COPYB => "store_operand_b(1",
-            _ => "store_operand(1",
-        };
         match storer {
             Constant(_) => inner, // Must still output the inner code in case there are side-effects
-            Memory(addr) => format!("{}, {}, {})", func, addr, inner),
+            Memory(addr) => format!("store_operand(1, {}, {})", addr, inner),
             Stack => format!("PushStack({})", inner),
             Local(val) => format!("l{} = {}", val / 4, inner),
-            RAM(addr) => format!("{}, {}, {})", func, addr + self.ramstart, inner),
+            RAM(addr) => format!("store_operand(1, {}, {})", addr + self.ramstart, inner),
         }
     }
 
     fn output_double_storer_safe(&self, instruction: &Instruction, inner: String) -> String {
-        use Operand::*;
         let store = |storer: Operand, i: u32| {
             match storer {
                 Constant(_) => String::from("NULL"),
@@ -256,7 +251,6 @@ impl GlulxOutput {
 
     // Construct a call
     fn output_call_safe(&self, instruction: &Instruction, mut args: Vec<String>, is_callf: bool) -> String {
-        use Operand::*;
         let callee_addr = match instruction.operands[0] {
             Constant(addr) => addr,
             _ => panic!("Dynamic callf not supported"),
@@ -304,7 +298,6 @@ impl GlulxOutput {
     }
 
     fn output_call_on_stack_safe(&self, instruction: &Instruction, addr: &String, count: &String) -> String {
-        use Operand::*;
         match instruction.operands[1] {
             Constant(count) => {
                 let mut args = Vec::new();
@@ -405,6 +398,40 @@ impl GlulxOutput {
                     unimplemented!();
                 }
             }
+        }
+    }
+
+    fn output_copys_safe(&self, instruction: &Instruction) -> String {
+        let inner = match instruction.operands[0] {
+            Constant(val) => format!("{} & 0xFFFF", val),
+            Memory(addr) => format!("Mem2({})", addr),
+            Stack => String::from("PopStack() & 0xFFFF"),
+            Local(val) => format!("l{} & 0xFFFF", val / 4),
+            RAM(addr) => format!("Mem2({})", addr + self.ramstart),
+        };
+        match instruction.operands[1] {
+            Constant(_) => inner,
+            Memory(addr) => format!("store_operand_s(1, {}, {})", addr, inner),
+            Stack => format!("PushStack({})", inner),
+            Local(val) => format!("l{} = (l{} & 0xFFFF0000) | {}", val, val, inner),
+            RAM(addr) => format!("store_operand_s(1, {}, {})", addr + self.ramstart, inner),
+        }
+    }
+
+    fn output_copyb_safe(&self, instruction: &Instruction) -> String {
+        let inner = match instruction.operands[0] {
+            Constant(val) => format!("{} & 0xFF", val),
+            Memory(addr) => format!("Mem1({})", addr),
+            Stack => String::from("PopStack() & 0xFF"),
+            Local(val) => format!("l{} & 0xFF", val / 4),
+            RAM(addr) => format!("Mem1({})", addr + self.ramstart),
+        };
+        match instruction.operands[1] {
+            Constant(_) => inner,
+            Memory(addr) => format!("store_operand_b(1, {}, {})", addr, inner),
+            Stack => format!("PushStack({})", inner),
+            Local(val) => format!("l{} = (l{} & 0xFFFFFF00) | {}", val, val, inner),
+            RAM(addr) => format!("store_operand_b(1, {}, {})", addr + self.ramstart, inner),
         }
     }
 }

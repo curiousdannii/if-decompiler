@@ -75,7 +75,7 @@ impl GlulxOutput {
             let function_spec = format!("glui32 VM_FUNC_{}({})", addr, args_list);
 
             writeln!(code_file, "{} {{
-    glui32 arg, label, oldsp, oldvsb, res, temp0, temp1;
+    glui32 arg, label, oldsp, oldvsb, res, temp0, temp1, temp2, temp3, temp4, temp5;
     valstackbase = stackptr;", function_spec)?;
             code_file.write(self.output_function_body(function).as_bytes())?;
             writeln!(code_file, "    return 0;
@@ -192,6 +192,7 @@ impl GlulxOutput {
         let op_b = operands.get(1).unwrap_or(&null);
         use opcodes::*;
         let body = match opcode {
+            // TODO: Check if call funcs need better stackpop protection
             OP_CALL => self.output_call_on_stack_safe(instruction, op_a, op_b),
             OP_RETURN => format!("return {}", op_a),
             OP_TAILCALL => format!("return {}", self.output_call_on_stack_safe(instruction, op_a, op_b)),
@@ -199,7 +200,7 @@ impl GlulxOutput {
             OP_COPYB => self.output_copyb_safe(instruction),
             OP_CALLF ..= OP_CALLFIII => self.output_callf_safe(instruction, operands),
             OP_GETIOSYS => self.output_double_storer_safe(instruction, String::from("stream_get_iosys(&temp0, &temp1)")),
-            OP_FMOD => self.output_double_storer_safe(instruction, format!("OP_FMOD({}, {}, &temp0, &temp1)", op_a, op_b)),
+            OP_FMOD => self.output_double_storer_safe(instruction, format_safe_stack_pops_expression("OP_FMOD({}, {}, &temp0, &temp1)", &operands)),
             _ => self.output_common_instruction(instruction, operands),
         };
         let body_with_storer = self.output_storer_safe(opcode, instruction.storer, body);

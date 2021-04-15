@@ -32,7 +32,7 @@ impl GlulxOutput {
 #include <math.h>
 
 void execute_loop(void) {{
-    glui32 temp0, temp1;
+    glui32 temp0, temp1, temp2, temp3, temp4, temp5;
     while (1) {{
         switch (pc) {{")?;
 
@@ -73,14 +73,13 @@ void execute_loop(void) {{
         let operands = self.map_operands_unsafe(instruction);
         let null = String::from("NULL");
         let op_a = operands.get(0).unwrap_or(&null);
-        let op_b = operands.get(1).unwrap_or(&null);
         use opcodes::*;
         let body = match opcode {
-            OP_CALL => self.output_call_unsafe(op_a, op_b, instruction),
+            OP_CALL => self.output_call_unsafe(&operands, instruction),
             OP_RETURN => format!("temp0 = {}; leave_function(); if (stackptr == 0) {{return;}} pop_callstub(temp0); break", op_a),
-            OP_TAILCALL => format!("VM_TAILCALL_FUNCTION({}, {}); if (stackptr == 0) {{return;}} break", op_a, op_b),
+            OP_TAILCALL => format_safe_stack_pops_statement("VM_TAILCALL_FUNCTION({}, {}); if (stackptr == 0) {{return;}} break", &operands),
             OP_CATCH => format!("OP_CATCH({}, {}, {})", instruction.next, storer_type(instruction.storer), self.storer_value(instruction.storer)),
-            OP_THROW => format!("temp0 = {}; stackptr = {}; pop_callstub(temp0); break", op_a, op_b),
+            OP_THROW => format!("temp0 = {}; stackptr = {}; pop_callstub(temp0); break", op_a, operands[1]),
             OP_COPYS => self.output_copys_unsafe(instruction),
             OP_COPYB => self.output_copyb_unsafe(instruction),
             OP_CALLF ..= OP_CALLFIII => self.output_callf_unsafe(instruction, operands),
@@ -91,7 +90,7 @@ void execute_loop(void) {{
             OP_SAVEUNDO => format!("OP_SAVEUNDO({}, {}, {})", instruction.next, storer_type(instruction.storer), self.storer_value(instruction.storer)),
             OP_RESTOREUNDO => format!("if (OP_RESTOREUNDO({}, {})) {{break;}}", storer_type(instruction.storer), self.storer_value(instruction.storer)),
             OP_QUIT => String::from("return"),
-            OP_FMOD => self.output_double_storer_unsafe(instruction, format!("OP_FMOD({}, {}, &temp0, &temp1)", op_a, op_b)),
+            OP_FMOD => self.output_double_storer_unsafe(instruction, format_safe_stack_pops_expression("OP_FMOD({}, {}, &temp0, &temp1)", &operands)),
             _ => self.output_storer_unsafe(instruction.storer, self.output_common_instruction(instruction, operands)),
         };
         self.output_branch_unsafe(instruction, body)
@@ -167,19 +166,23 @@ void execute_loop(void) {{
         }
     }
 
-    fn output_call_unsafe(&self, addr: &String, count: &String, instruction: &Instruction) -> String {
-        format!("if (VM_CALL_FUNCTION({}, {}, {}, {}, {})) {{break;}}", addr, count, storer_type(instruction.storer), self.storer_value(instruction.storer), instruction.next)
+    fn output_call_unsafe(&self, operands: &Vec<String>, instruction: &Instruction) -> String {
+        let (prelude, new_operands) = safe_stack_pops(operands);
+        let prelude_out = if prelude == "" { String::new() } else { format!("{}; ", prelude) };
+        format!("{}if (VM_CALL_FUNCTION({}, {}, {}, {}, {})) {{break;}}", prelude_out, new_operands[0], new_operands[1], storer_type(instruction.storer), self.storer_value(instruction.storer), instruction.next)
     }
 
     fn output_callf_unsafe(&self, instruction: &Instruction, operands: Vec<String>) -> String {
+        let (prelude, new_operands) = safe_stack_pops(&operands);
         let inner = match operands.len() {
             1 => format!("VM_CALL_FUNCTION({}, 0", operands[0]),
-            2 => format!("OP_CALLFI({}", operands.join(", ")),
-            3 => format!("OP_CALLFII({}", operands.join(", ")),
-            4 => format!("OP_CALLFIII({}", operands.join(", ")),
+            2 => format!("OP_CALLFI({}", new_operands.join(", ")),
+            3 => format!("OP_CALLFII({}", new_operands.join(", ")),
+            4 => format!("OP_CALLFIII({}", new_operands.join(", ")),
             _ => unreachable!(),
         };
-        format!("if ({}, {}, {}, {})) {{break;}}", inner, storer_type(instruction.storer), self.storer_value(instruction.storer), instruction.next)
+        let prelude_out = if prelude == "" { String::new() } else { format!("{}; ", prelude) };
+        format!("{}if ({}, {}, {}, {})) {{break;}}", prelude_out, inner, storer_type(instruction.storer), self.storer_value(instruction.storer), instruction.next)
     }
 
     fn output_copys_unsafe(&self, instruction: &Instruction) -> String {

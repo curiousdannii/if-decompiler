@@ -13,6 +13,8 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
+use dyn_fmt::AsStrFormatExt;
+
 use if_decompiler::glulx::GlulxState;
 
 mod functions_common;
@@ -49,4 +51,56 @@ impl GlulxOutput {
         let file = fs::File::create(path)?;
         Ok(io::BufWriter::new(file))
     }
+}
+
+// C says that the order function arguments are evaluated is undefined, which breaks stack pops
+// This function takes a Vec of operand strings, and fixes them to ensure the order is right
+fn safe_stack_pops(operands: &Vec<String>) -> (String, Vec<String>) {
+    let mut stack_operands = 0;
+    for operand in operands {
+        if operand == "PopStack()" {
+            stack_operands += 1;
+        }
+    }
+    if stack_operands <= 1 {
+        let mut new_operands = Vec::default();
+        for operand in operands {
+            new_operands.push(operand.clone());
+        }
+        return (String::new(), new_operands);
+    }
+
+    // Build the new operands
+    let mut prelude = Vec::default();
+    let mut new_operands = Vec::default();
+    let mut op = 0;
+    for operand in operands {
+        if operand == "PopStack()" && op + 1 < stack_operands {
+            prelude.push(format!("temp{} = PopStack()", op));
+            new_operands.push(format!("temp{}", op));
+            op += 1;
+        }
+        else {
+            new_operands.push(operand.clone());
+        }
+    }
+    (prelude.join(", "), new_operands)
+}
+
+// And then a function to use the above with a format string for an expression
+fn format_safe_stack_pops_expression(format: &str, operands: &Vec<String>) -> String {
+    let (prelude, new_operands) = safe_stack_pops(operands);
+    if prelude == "" {
+        return format.format(operands);
+    }
+    format!("({}, {})", prelude, format.format(&new_operands))
+}
+
+// And the same but for a statement
+fn format_safe_stack_pops_statement(format: &str, operands: &Vec<String>) -> String {
+    let (prelude, new_operands) = safe_stack_pops(operands);
+    if prelude == "" {
+        return format.format(operands);
+    }
+    format!("{}; {}", prelude, format.format(&new_operands))
 }

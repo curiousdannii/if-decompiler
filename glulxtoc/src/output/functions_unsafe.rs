@@ -30,12 +30,10 @@ impl GlulxOutput {
 #include \"glulxe.h\"
 #include \"glulxtoc.h\"
 #include <math.h>
-#include <stdio.h>
 
 void execute_loop(void) {{
     glui32 temp0, temp1;
     while (1) {{
-        //printf(\"execute_loop %d\\n\", pc);
         switch (pc) {{")?;
 
         // Output the function bodies

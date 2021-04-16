@@ -119,6 +119,7 @@ fn parse_debug_file(str: BufReader<File>) -> quick_xml::Result<BTreeMap<u32, Deb
     let mut result = BTreeMap::default();
     let mut buf = Vec::new();
     let mut in_routine = false;
+    let mut process_text = false;
     let mut text = String::new();
     let mut addr = 0;
     let mut len = 0;
@@ -127,13 +128,19 @@ fn parse_debug_file(str: BufReader<File>) -> quick_xml::Result<BTreeMap<u32, Deb
     loop {
         match reader.read_event(&mut buf) {
             Ok(Event::Start(ref e)) => {
-                if e.name() == b"routine" {
-                    in_routine = true;
-                }
-                text.clear();
+                match e.name() {
+                    b"byte-count" | b"identifier" | b"value" => {
+                        process_text = true;
+                        text.clear();
+                    },
+                    b"routine" => {
+                        in_routine = true;
+                    },
+                    _ => {},
+                };
             },
             Ok(Event::Text(e)) => {
-                if in_routine {
+                if in_routine && process_text {
                     text.push_str(&e.unescape_and_decode(&reader)?);
                 }
             },
@@ -165,9 +172,10 @@ fn parse_debug_file(str: BufReader<File>) -> quick_xml::Result<BTreeMap<u32, Deb
                     },
                     _ => {},
                 };
+                process_text = false;
             },
             Ok(Event::Eof) => break,
-            Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
+            Err(e) => panic!("XML error in debug file at position {}: {:?}", reader.buffer_position(), e),
             _ => (),
         };
         buf.clear();

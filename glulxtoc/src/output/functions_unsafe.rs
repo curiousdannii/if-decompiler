@@ -88,7 +88,7 @@ void execute_loop(void) {{
             OP_CALL => self.output_call_unsafe(&operands, instruction),
             OP_RETURN => format!("temp0 = {}; leave_function(); if (stackptr == 0) {{return;}} pop_callstub(temp0); break", op_a),
             OP_TAILCALL => format_safe_stack_pops_statement("VM_TAILCALL_FUNCTION({}, {}); if (stackptr == 0) {{return;}} break", &operands),
-            OP_CATCH => format!("OP_CATCH({}, {}, {})", instruction.next, storer_type(instruction.storer), self.storer_value(instruction.storer)),
+            OP_CATCH => format!("if (OP_CATCH({}, {}, {}, {})) {{return;}} break", storer_type(instruction.operands[0]), self.storer_value(instruction.operands[0]), operands[1], instruction.next),
             OP_THROW => format!("temp0 = {}; stackptr = {}; pop_callstub(temp0); break", op_a, operands[1]),
             OP_COPYS => self.output_copys_unsafe(instruction),
             OP_COPYB => self.output_copyb_unsafe(instruction),
@@ -145,25 +145,15 @@ void execute_loop(void) {{
     }
 
     fn output_branch_unsafe(&self, instruction: &Instruction, condition: String) -> String {
-        use Branch::*;
         use opcodes::*;
         match instruction.branch {
-            DoesNotBranch => condition,
-            Branches(branch) => {
-                let action = self.output_branch_action_unsafe(instruction, branch);
-                match instruction.opcode {
-                    OP_CATCH => format!("{}; {}; break", condition, action),
-                    _ => format!("if ({}) {{{}; break;}}", condition, action),
-                }
+            None => condition,
+            Some(target) => match instruction.opcode {
+                OP_CATCH => condition,
+                OP_JUMP => format!("{}; break", self.output_branch_action_unsafe(instruction, target)),
+                OP_JUMPABS => format!("pc = {}; break", self.output_operand_unsafe(*instruction.operands.last().unwrap())),
+                _ => format!("if ({}) {{{}; break;}}", condition, self.output_branch_action_unsafe(instruction, target)),
             },
-            Jumps(branch) => {
-                if instruction.opcode == OP_JUMP {
-                    format!("{}; break", self.output_branch_action_unsafe(instruction, branch))
-                }
-                else {
-                    format!("pc = {}; break", self.output_operand_unsafe(*instruction.operands.last().unwrap()))
-                }
-            }
         }
     }
 

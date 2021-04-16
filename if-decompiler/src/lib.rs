@@ -134,13 +134,6 @@ pub fn calculate_basic_blocks<I: VMInstruction>(instructions: Vec<I>, entry_poin
 }
 
 #[derive(Copy, Clone, PartialEq)]
-pub enum Branch {
-    DoesNotBranch,
-    Branches(BranchTarget),
-    Jumps(BranchTarget),
-}
-
-#[derive(Copy, Clone, PartialEq)]
 pub enum BranchTarget {
     Dynamic,
     Absolute(u32),

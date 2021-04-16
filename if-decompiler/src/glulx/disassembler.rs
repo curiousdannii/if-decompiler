@@ -213,35 +213,35 @@ impl GlulxState {
             instruction_addresses.insert(instruction.addr);
 
             // If this instruction branches, then update the entry and exit points
-            use Branch::*;
-            match instruction.branch {
-                DoesNotBranch => {},
-                Branches(target) => {
-                    // If the branch returns then don't end a basic block here
-                    // Except for @catch!
-                    let returns = match target {
-                        BranchTarget::Return(_) => true,
-                        _ => false,
-                    };
-                    if !returns || instruction.opcode == opcodes::OP_CATCH {
-                        entry_points.insert(instruction.next);
-                        let mut branch_targets = vec![instruction.next];
+            if let Some(target) = instruction.branch {
+                match instruction.opcode {
+                    opcodes::OP_JUMP | opcodes::OP_JUMPABS => {
+                        let mut branch_targets = Vec::new();
                         if let BranchTarget::Absolute(addr) = target {
                             entry_points.insert(addr);
                             branch_targets.push(addr);
                         }
                         exit_branches.insert(instruction.addr, branch_targets);
-                    }
-                },
-                Jumps(target) => {
-                    let mut branch_targets = Vec::new();
-                    if let BranchTarget::Absolute(addr) = target {
-                        entry_points.insert(addr);
-                        branch_targets.push(addr);
-                    }
-                    exit_branches.insert(instruction.addr, branch_targets);
-                }
-            };
+                    },
+                    _ => {
+                        // If the branch returns then don't end a basic block here
+                        // Except for @catch!
+                        let returns = match target {
+                            BranchTarget::Return(_) => true,
+                            _ => false,
+                        };
+                        if !returns || instruction.opcode == opcodes::OP_CATCH {
+                            entry_points.insert(instruction.next);
+                            let mut branch_targets = vec![instruction.next];
+                            if let BranchTarget::Absolute(addr) = target {
+                                entry_points.insert(addr);
+                                branch_targets.push(addr);
+                            }
+                            exit_branches.insert(instruction.addr, branch_targets);
+                        }
+                    },
+                };
+            }
             let opcode = instruction.opcode;
 
             // If this instruction calls, then add it to the graph
@@ -366,19 +366,16 @@ impl GlulxState {
                 _ => Dynamic,
             }
         };
-        use opcodes::{BranchMode, StoreMode};
         let branch = match opcodes::instruction_branches(opcode) {
-            BranchMode::DoesNotBranch => Branch::DoesNotBranch,
-            BranchMode::Branches => Branch::Branches(calc_branch()),
-            BranchMode::Jumps => Branch::Jumps(calc_branch()),
+            true => Some(calc_branch()),
+            false => None,
         };
 
         // Extract the storer(s) - in reverse order (makes it simpler for OP_FMOD)
-        use StoreMode::*;
+        use opcodes::StoreMode::*;
         let (storer2, storer) = match opcodes::instruction_stores(opcode) {
             DoesNotStore => (Operand::Constant(0), Operand::Constant(0)),
             LastOperand => (Operand::Constant(0), operands.pop().unwrap()),
-            FirstOperand => (Operand::Constant(0), operands.remove(0)),
             LastTwoOperands => (operands.pop().unwrap(), operands.pop().unwrap()),
         };
 

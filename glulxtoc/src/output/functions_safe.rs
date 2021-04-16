@@ -315,25 +315,39 @@ impl GlulxOutput {
     }
 
     fn output_branch_safe(&self, function: &Function, simple_block: &mut GlulxSimpleBlock, instruction: &Instruction, condition: String, indents: usize) -> String {
-        use Branch::*;
         use BranchTarget::*;
         use opcodes::*;
         let indent = "    ".repeat(indents);
         match instruction.branch {
-            DoesNotBranch => format!("{};", condition),
-            Branches(branch) => {
-                match branch {
+            None => format!("{};", condition),
+            Some(target) => {
+                match target {
                     Dynamic => panic!("Dynamic branch in safe function"),
                     Absolute(addr) => {
                         // Look in the block's branches to see if we break, continue, etc
                         if let Some(branch_mode) = simple_block.branches.get(&addr) {
-                            return format!("if ({}) {{{};}}", condition, output_branchmode(branch_mode, addr))
+                            return match instruction.opcode {
+                                OP_JUMP => format!("{};", output_branchmode(branch_mode, addr)),
+                                OP_JUMPABS => unimplemented!(),
+                                _ => format!("if ({}) {{{};}}", condition, output_branchmode(branch_mode, addr)),
+                            };
                         }
+
                         // Inspect the next block
                         match simple_block.immediate.as_deref_mut() {
-                            Some(immediate_block) => {
+                            Some(mut immediate_block) => {
                                 match immediate_block {
-                                    Simple(_) => panic!("Should not branch directly into a SimpleBlock"),
+                                    Simple(_) => {
+                                        match instruction.opcode {
+                                            OP_JUMP => {
+                                                let output = format!("/* Jumping into immediate */\n{}", self.output_shaped_block(function, &mut immediate_block, indents));
+                                                simple_block.immediate = None;
+                                                output
+                                            },
+                                            OP_JUMPABS => unimplemented!(),
+                                            _ => panic!("Should not branch directly into a SimpleBlock"),
+                                        }
+                                    },
                                     Loop(_) => panic!("Should not branch directly into a LoopBlock"),
                                     LoopMulti(_block) => {
                                         unimplemented!()
@@ -346,60 +360,20 @@ impl GlulxOutput {
                                             output.push_str(&format!("\n{}else {{\n{}{}}}", indent, self.output_shaped_block(function, &mut else_block, indents + 1), indent));
                                         }
                                         simple_block.immediate = None;
-                                        return output
-                                    }
+                                        output
+                                    },
                                 }
                             },
                             None => panic!("Branch with neither BranchMode nor immediate"),
                         }
                     },
-                    Return(val) => return format!("if ({}) {{ return {}; }}", condition, val),
+                    Return(val) => match instruction.opcode {
+                        OP_JUMP => format!("return {};", val),
+                        OP_JUMPABS => unimplemented!(),
+                        _ => format!("if ({}) {{ return {}; }}", condition, val),
+                    },
                 }
             },
-            Jumps(branch) => {
-                if instruction.opcode == OP_JUMP {
-                    match branch {
-                        Dynamic => panic!("Dynamic branch in safe function"),
-                        Absolute(addr) => {
-                            // Look in the block's branches to see if we break, continue, etc
-                            if let Some(branch_mode) = simple_block.branches.get(&addr) {
-                                return format!("{};", output_branchmode(branch_mode, addr))
-                            }
-                            // Inspect the next block
-                            match simple_block.immediate.as_deref_mut() {
-                                Some(mut immediate_block) => {
-                                    match immediate_block {
-                                        Simple(_) => {
-                                            let output = format!("/* Jumping into immediate */\n{}", self.output_shaped_block(function, &mut immediate_block, indents));
-                                            simple_block.immediate = None;
-                                            return output
-                                        },
-                                        Loop(_) => panic!("Should not branch directly into a LoopBlock"),
-                                        LoopMulti(_block) => {
-                                            unimplemented!()
-                                        },
-                                        Multiple(block) => {
-                                            let mut if_block = find_multiple(&mut block.handled, addr).unwrap();
-                                            let mut output = format!("if ({}) {{\n{}{}}}", condition, self.output_shaped_block(function, &mut if_block, indents + 1), indent);
-                                            let else_block_option = find_multiple(&mut block.handled, instruction.next);
-                                            if let Some(mut else_block) = else_block_option {
-                                                output.push_str(&format!("\n{}else {{\n{}{}}}", indent, self.output_shaped_block(function, &mut else_block, indents + 1), indent));
-                                            }
-                                            simple_block.immediate = None;
-                                            return output
-                                        }
-                                    }
-                                },
-                                None => panic!("Branch with neither BranchMode nor immediate"),
-                            }
-                        },
-                        Return(val) => format!("return {};", val),
-                    }
-                }
-                else {
-                    unimplemented!();
-                }
-            }
         }
     }
 

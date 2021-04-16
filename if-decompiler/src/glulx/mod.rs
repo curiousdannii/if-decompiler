@@ -73,7 +73,7 @@ pub struct Instruction {
     pub addr: u32,
     pub opcode: u32,
     pub operands: Vec<Operand>,
-    pub branch: Branch,
+    pub branch: Option<BranchTarget>,
     // These could be inside an Option, but we can just set them to Constants if the instruction doesn't store
     pub storer: Operand,
     pub storer2: Operand,

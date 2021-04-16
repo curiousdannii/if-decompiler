@@ -155,20 +155,11 @@ pub fn operands_count(opcode: u32, addr: u32) -> usize {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
-pub enum BranchMode {
-    DoesNotBranch,
-    Branches,
-    Jumps,
-}
-
 // Whether an instruction branches or jumps
-pub fn instruction_branches(opcode: u32) -> BranchMode {
-    use BranchMode::*;
+pub fn instruction_branches(opcode: u32) -> bool {
     match opcode {
-        OP_JZ ..= OP_JLEU | OP_CATCH | OP_JFEQ ..= OP_JISINF => Branches,
-        OP_JUMP | OP_JUMPABS => Jumps,
-        _ => DoesNotBranch,
+        OP_JUMP ..= OP_JLEU | OP_CATCH | OP_JUMPABS | OP_JFEQ ..= OP_JISINF => true,
+        _ => false,
     }
 }
 
@@ -193,7 +184,6 @@ pub fn instruction_halts(opcode: u32) -> bool {
 pub enum StoreMode {
     DoesNotStore,
     LastOperand,
-    FirstOperand,
     LastTwoOperands,
 }
 
@@ -208,7 +198,6 @@ pub fn instruction_stores(opcode: u32) -> StoreMode {
             | OP_SAVE ..= OP_RESTOREUNDO | OP_GLK | OP_GETSTRINGTBL
             | OP_LINEARSEARCH ..= OP_CALLFIII | OP_MALLOC | OP_NUMTOF ..= OP_FDIV
             | OP_SQRT ..= OP_ATAN2 => LastOperand,
-        OP_CATCH => FirstOperand,
         OP_GETIOSYS | OP_FMOD => LastTwoOperands,
         _ => DoesNotStore,
     }
@@ -220,7 +209,7 @@ pub fn function_safety(instructions: &Vec<Instruction>) -> FunctionSafety {
     let mut result = SafetyTBD;
     for instruction in instructions {
         match instruction.opcode {
-            OP_CATCH | OP_THROW | OP_QUIT | OP_RESTART ..= OP_RESTOREUNDO => result = Unsafe,
+            OP_THROW | OP_QUIT | OP_RESTART ..= OP_RESTOREUNDO => result = Unsafe,
 
             // Calls to non-constants are unsafe
             OP_CALL | OP_TAILCALL | OP_CALLF ..= OP_CALLFIII => match instruction.operands[0] {
@@ -229,7 +218,7 @@ pub fn function_safety(instructions: &Vec<Instruction>) -> FunctionSafety {
             }
 
             // Branches to non-constants are unsafe
-            OP_JUMP ..= OP_JLEU | OP_JUMPABS | OP_JFEQ ..= OP_JISINF => match instruction.operands.last().unwrap() {
+            OP_JUMP ..= OP_JLEU | OP_CATCH | OP_JUMPABS | OP_JFEQ ..= OP_JISINF => match instruction.operands.last().unwrap() {
                 Operand::Constant(_) => continue,
                 _ => return UnsafeDynamicBranches,
             }

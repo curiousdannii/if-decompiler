@@ -106,11 +106,11 @@ glui32 OP_SSHIFTR(glui32 arg0, glui32 arg1) {
     return (glsi32) arg0 >> (glsi32) vals0;
 }
 
-int OP_CATCH(glui32 next, glui32 storetype, glui32 storeval) {
+int OP_CATCH(glui32 storetype, glui32 storeval, glui32 offset, glui32 next) {
     pc = next;
     push_callstub(storetype, storeval);
     store_operand(storetype, storeval, stackptr);
-    return 1;
+    return VM_BRANCH(offset, next);
 }
 
 glui32 OP_SEXS(glui32 arg0) {

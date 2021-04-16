@@ -73,10 +73,11 @@ impl GlulxOutput {
             };
             let args_list = function_arguments(function.locals, true, ",");
             let function_spec = format!("glui32 VM_FUNC_{}({})", addr, args_list);
+            let name_comment = self.state.debug_function_data.as_ref().map_or(String::new(), |functions| format!("// VM Function {} ({})\n", addr, functions.get(addr).unwrap().name));
 
-            writeln!(code_file, "{} {{
+            writeln!(code_file, "{}{} {{
     glui32 arg, label, oldsp, oldvsb, res, temp0, temp1, temp2, temp3, temp4, temp5;
-    valstackbase = stackptr;", function_spec)?;
+    valstackbase = stackptr;", name_comment, function_spec)?;
             code_file.write(self.output_function_body(function).as_bytes())?;
             writeln!(code_file, "    return 0;
 }}

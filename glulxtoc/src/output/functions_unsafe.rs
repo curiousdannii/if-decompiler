@@ -13,6 +13,7 @@ use std::io::prelude::*;
 use std::time::Instant;
 
 use if_decompiler::*;
+use FunctionSafety::*;
 use glulx::*;
 use Operand::*;
 use glulx::opcodes;
@@ -20,7 +21,7 @@ use glulx::opcodes;
 use super::*;
 
 impl GlulxOutput {
-    pub fn output_unsafe_functions(&self) -> std::io::Result<()> {
+    pub fn output_unsafe_functions(&mut self) -> std::io::Result<()> {
         let start = Instant::now();
 
         let mut code_file = self.make_file("functions_unsafe.c")?;
@@ -38,16 +39,25 @@ void execute_loop(void) {{
 
         // Output the function bodies
         for (addr, function) in &self.state.functions {
-            if !self.disassemble_mode && function.safety == FunctionSafety::SafetyTBD {
+            if !self.disassemble_mode && function.safety == SafetyTBD {
                 continue;
             }
 
-            writeln!(code_file, "            // VM_FUNC_{}", addr)?;
+            if function.safety == UnsafeDynamicBranches && self.state.debug_function_data.is_none() && !self.have_warned_about_dynamic_branches {
+                println!("Warning ❗ This Glulx file features dynamic branches or jumps; please provide an Inform debug file.");
+                self.have_warned_about_dynamic_branches = true;
+            }
+
+            let name = self.state.debug_function_data.as_ref().map_or(String::new(), |functions| format!(" ({})", functions.get(addr).unwrap().name));
+            writeln!(code_file, "            // VM Function {}{}", addr, name)?;
 
             for (label, block) in &function.blocks {
-                writeln!(code_file, "            case {}:", label)?;
+                if function.safety != UnsafeDynamicBranches {
+                    writeln!(code_file, "            case {}:", label)?;
+                }
                 for instruction in &block.code {
-                    writeln!(code_file, "                /* {:>3X}/{} */ {};", instruction.opcode, instruction.addr, self.output_instruction_unsafe(&instruction))?;
+                    let instruction_label = if function.safety == UnsafeDynamicBranches { format!("case {}: ", instruction.addr) } else { String::new() };
+                    writeln!(code_file, "                {}/* {:>3X}/{} */ {};", instruction_label, instruction.opcode, instruction.addr, self.output_instruction_unsafe(&instruction))?;
                 }
             }
         }

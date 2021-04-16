@@ -25,6 +25,7 @@ mod templates;
 
 pub struct GlulxOutput {
     pub disassemble_mode: bool,
+    pub have_warned_about_dynamic_branches: bool,
     pub name: String,
     pub out_dir: PathBuf,
     pub ramstart: u32,
@@ -33,7 +34,7 @@ pub struct GlulxOutput {
 }
 
 impl GlulxOutput {
-    pub fn output(&self) -> io::Result<()> {
+    pub fn output(&mut self) -> io::Result<()> {
         // Make the output directory if necessary
         fs::create_dir_all(&self.out_dir)?;
 

@@ -9,8 +9,10 @@ https://github.com/curiousdannii/if-decompiler
 
 */
 
-use bytes::Buf;
+use std::collections::BTreeMap;
 use std::io::Cursor;
+
+use bytes::Buf;
 use fnv::FnvHashMap;
 use petgraph::graph;
 
@@ -20,15 +22,17 @@ mod disassembler;
 pub mod opcodes;
 
 pub struct GlulxState {
-    pub image: Box<[u8]>,
+    pub debug_function_data: Option<BTreeMap<u32, DebugFunctionData>>,
     pub functions: FnvHashMap<u32, Function>,
+    pub image: Box<[u8]>,
 }
 
 impl GlulxState {
-    pub fn new(image: Box<[u8]>) -> GlulxState {
+    pub fn new(image: Box<[u8]>, debug_function_data: Option<BTreeMap<u32, DebugFunctionData>>) -> GlulxState {
         GlulxState {
-            image,
+            debug_function_data,
             functions: FnvHashMap::default(),
+            image,
         }
     }
 
@@ -50,7 +54,10 @@ impl VirtualMachine for GlulxState {
     }
 
     fn mark_function_as_unsafe(&mut self, addr: u32) {
-        self.functions.get_mut(&addr).unwrap().safety = FunctionSafety::Unsafe;
+        let function = self.functions.get_mut(&addr).unwrap();
+        if function.safety == FunctionSafety::SafetyTBD {
+            function.safety = FunctionSafety::Unsafe;
+        }
     }
 }
 

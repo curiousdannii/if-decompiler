@@ -217,24 +217,25 @@ pub fn instruction_stores(opcode: u32) -> StoreMode {
 // Return the FunctionSafety for a function's instructions
 pub fn function_safety(instructions: &Vec<Instruction>) -> FunctionSafety {
     use FunctionSafety::*;
+    let mut result = SafetyTBD;
     for instruction in instructions {
         match instruction.opcode {
-            OP_CATCH | OP_THROW | OP_QUIT | OP_RESTART ..= OP_RESTOREUNDO => return Unsafe,
+            OP_CATCH | OP_THROW | OP_QUIT | OP_RESTART ..= OP_RESTOREUNDO => result = Unsafe,
 
             // Calls to non-constants are unsafe
             OP_CALL | OP_TAILCALL | OP_CALLF ..= OP_CALLFIII => match instruction.operands[0] {
                 Operand::Constant(_) => continue,
-                _ => return Unsafe,
+                _ => result = Unsafe,
             }
 
             // Branches to non-constants are unsafe
             OP_JUMP ..= OP_JLEU | OP_JUMPABS | OP_JFEQ ..= OP_JISINF => match instruction.operands.last().unwrap() {
                 Operand::Constant(_) => continue,
-                _ => return Unsafe,
+                _ => return UnsafeDynamicBranches,
             }
 
             _ => continue,
         };
     }
-    SafetyTBD
+    result
 }

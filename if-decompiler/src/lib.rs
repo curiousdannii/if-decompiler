@@ -18,12 +18,22 @@ use petgraph::{graph, visit};
 
 pub mod glulx;
 
+// Function data from an Inform debug file
+#[derive(Debug)]
+pub struct DebugFunctionData {
+    pub addr: u32,
+    pub len: u32,
+    pub name: String,
+}
+
 // Function safety refers to whether or not a function can be compiled and run without worrying about its locals and stack being part of the savestate
 // Unsafe functions need to be compiled such that they can be serialised and restored
+// UnsafeDynamicBranches functions have dynamic branches and need even more special care
 // SafetyTBD functions have not yet been determined. At the end of decompilation any remaining SafetyTBD functions will be assumed safe.
 #[derive(Copy, Clone, PartialEq)]
 pub enum FunctionSafety {
     Unsafe,
+    UnsafeDynamicBranches,
     SafetyTBD,
 }
 

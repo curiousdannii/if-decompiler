@@ -29,6 +29,18 @@ impl GlulxState {
         let root_node_addr = self.read_addr(decoding_table_addr + 8);
 
         let mut cursor = Cursor::new(&self.image);
+
+        // If we have debug file data, use it to disassemble all the functions
+        if let Some(functions) = &self.debug_function_data {
+            for (&addr, func) in functions {
+                // Skip the object byte
+                cursor.set_position(addr as u64 + 1);
+                self.functions.insert(func.addr, self.disassemble_function(&mut cursor, &mut graph, addr, Some(func.len)));
+            }
+            return graph;
+        }
+
+        // Otherwise parse the file manually
         // Skip past the header
         cursor.set_position(60);
 
@@ -43,7 +55,7 @@ impl GlulxState {
 
                 // Functions
                 0xC0 | 0xC1 => {
-                    self.functions.insert(addr, self.disassemble_function(&mut cursor, &mut graph, addr));
+                    self.functions.insert(addr, self.disassemble_function(&mut cursor, &mut graph, addr, None));
                 },
 
                 // Strings - just skip past them for now!
@@ -173,7 +185,7 @@ impl GlulxState {
         table
     }
 
-    fn disassemble_function(&self, cursor: &mut Cursor<&Box<[u8]>>, graph: &mut DisassemblyGraph, addr: u32) -> Function {
+    fn disassemble_function(&self, cursor: &mut Cursor<&Box<[u8]>>, graph: &mut DisassemblyGraph, addr: u32, len: Option<u32>) -> Function {
         // Parse the locals formats
         let mut locals = 0;
         loop {
@@ -193,6 +205,7 @@ impl GlulxState {
         let mut exit_branches = FnvHashMap::default();
 
         // Parse the instructions
+        let end_addr = len.map(|l| addr + l);
         let mut instructions = Vec::new();
         let mut instruction_addresses = FnvHashSet::default();
         'parse_loop: loop {
@@ -244,6 +257,14 @@ impl GlulxState {
 
             instructions.push(instruction);
 
+            // If we have an end_addr (from a debug file) then use it to determine when to stop decoding
+            if let Some(end_addr) = end_addr {
+                if cursor.position() as u32 == end_addr {
+                    break;
+                }
+                continue;
+            }
+
             if opcodes::instruction_halts(opcode) {
                 // Stop parsing instructions if we don't have any pending entry_points
                 // Short cut - check if the next address is an entry point
@@ -267,7 +288,7 @@ impl GlulxState {
 
         // Add to the DisassemblyGraph's list of unsafe functions
         let safety = opcodes::function_safety(&instructions);
-        if safety == FunctionSafety::Unsafe {
+        if safety != FunctionSafety::SafetyTBD {
             graph.unsafe_functions.push(addr);
         }
 

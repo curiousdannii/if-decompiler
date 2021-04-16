@@ -10,5 +10,6 @@ edition = "2018"
 dyn-fmt = "0.3.0"
 fnv = "1.0.7"
 if-decompiler = {path = "../if-decompiler"}
+quick-xml = "0.22"
 relooper = {path = "../relooper"}
 structopt = "0.3.13"

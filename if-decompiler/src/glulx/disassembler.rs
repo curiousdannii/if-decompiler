@@ -29,10 +29,10 @@ impl GlulxState {
         let root_node_addr = self.read_addr(decoding_table_addr + 8);
 
         let mut cursor = Cursor::new(&self.image);
-        // Start from the same place as glulxdump
-        cursor.set_position(56);
+        // Skip past the header
+        cursor.set_position(60);
 
-        // Loop through the ROM
+        // Loop through the ROM until the end of RAM or we find a
         while cursor.position() < ram_start {
             let addr = cursor.position() as u32;
             let object_type = cursor.get_u8();
@@ -255,6 +255,14 @@ impl GlulxState {
                     break;
                 }
             }
+        }
+
+        // Check for a final unreachable return
+        let final_addr = cursor.position();
+        let next_byte = cursor.get_u8() as u32;
+        cursor.set_position(final_addr);
+        if next_byte == opcodes::OP_RETURN {
+            self.disassemble_instruction(cursor);
         }
 
         // Add to the DisassemblyGraph's list of unsafe functions

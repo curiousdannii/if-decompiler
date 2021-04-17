@@ -24,7 +24,7 @@ target_link_libraries(glulxe cheapglk m)
 add_sources(glulxe "WORKSPACE/upstream/glulxe/"
     SRCS accel.c files.c float.c funcs.c gestalt.c glkop.c heap.c main.c
     operand.c osdepend.c profile.c search.c serial.c string.c vm.c)
-target_compile_definitions(glulxe PRIVATE OS_UNIX)
+target_compile_definitions(glulxe PRIVATE OS_UNIX FLOAT_COMPILE_SAFER_POWF)
 target_compile_options(glulxe PRIVATE -Wall -Wmissing-prototypes -Wstrict-prototypes -Wno-unused)
 target_include_directories(glulxe PUBLIC WORKSPACE/upstream/glulxe/)
 

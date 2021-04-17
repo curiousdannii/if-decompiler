@@ -255,6 +255,11 @@ impl GlulxState {
                 }
             }
 
+            // Add an entry point for saveundo
+            if let opcodes::OP_SAVE | opcodes::OP_SAVEUNDO = opcode {
+                entry_points.insert(instruction.next);
+            }
+
             instructions.push(instruction);
 
             // If we have an end_addr (from a debug file) then use it to determine when to stop decoding

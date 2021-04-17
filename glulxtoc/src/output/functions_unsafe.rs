@@ -167,13 +167,13 @@ void execute_loop(void) {{
     }
 
     fn output_call_unsafe(&self, operands: &Vec<String>, instruction: &Instruction) -> String {
-        let (prelude, new_operands) = safe_stack_pops(operands);
+        let (prelude, new_operands) = safe_stack_pops(operands, false);
         let prelude_out = if prelude == "" { String::new() } else { format!("{}; ", prelude) };
         format!("{}if (VM_CALL_FUNCTION({}, {}, {}, {}, {})) {{break;}}", prelude_out, new_operands[0], new_operands[1], storer_type(instruction.storer), self.storer_value(instruction.storer), instruction.next)
     }
 
     fn output_callf_unsafe(&self, instruction: &Instruction, operands: Vec<String>) -> String {
-        let (prelude, new_operands) = safe_stack_pops(&operands);
+        let (prelude, new_operands) = safe_stack_pops(&operands, false);
         let inner = match operands.len() {
             1 => format!("VM_CALL_FUNCTION({}, 0", operands[0]),
             2 => format!("OP_CALLFI({}", new_operands.join(", ")),

@@ -62,9 +62,9 @@ impl GlulxOutput {
             // OP_COPYS | OP_COPYB
             OP_SEXS => runtime("OP_SEXS", &args),
             OP_SEXB => runtime("OP_SEXB", &args),
-            OP_ALOAD => format_safe_stack_pops_expression("Mem4({} + 4 * (glsi32) {})", &args),
-            OP_ALOADS => format_safe_stack_pops_expression("Mem2({} + 2 * (glsi32) {})", &args),
-            OP_ALOADB => format_safe_stack_pops_expression("Mem1({} + (glsi32) {})", &args),
+            OP_ALOAD => format_safe_stack_pops_macro("Mem4({} + 4 * (glsi32) {})", &args),
+            OP_ALOADS => format_safe_stack_pops_macro("Mem2({} + 2 * (glsi32) {})", &args),
+            OP_ALOADB => format_safe_stack_pops_macro("Mem1({} + (glsi32) {})", &args),
             OP_ALOADBIT => runtime("OP_ALOADBIT", &args),
             OP_ASTORE => format_safe_stack_pops_expression("store_operand(1, {} + 4 * (glsi32) {}, {})", &args),
             OP_ASTORES => format_safe_stack_pops_expression("store_operand_s(1, {} + 2 * (glsi32) {}, {})", &args),
@@ -144,7 +144,7 @@ impl GlulxOutput {
 }
 
 fn runtime(name: &str, operands: &Vec<String>) -> String {
-    let (prelude, new_operands) = safe_stack_pops(operands);
+    let (prelude, new_operands) = safe_stack_pops(operands, false);
     if prelude == "" {
         return format!("{}({})", name, operands.join(", "));
     }

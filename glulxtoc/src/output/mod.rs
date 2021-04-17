@@ -56,14 +56,15 @@ impl GlulxOutput {
 
 // C says that the order function arguments are evaluated is undefined, which breaks stack pops
 // This function takes a Vec of operand strings, and fixes them to ensure the order is right
-fn safe_stack_pops(operands: &Vec<String>) -> (String, Vec<String>) {
+fn safe_stack_pops(operands: &Vec<String>, in_macro: bool) -> (String, Vec<String>) {
+    let safe_pops = if in_macro { 0 } else { 1 };
     let mut stack_operands = 0;
     for operand in operands {
         if operand == "PopStack()" {
             stack_operands += 1;
         }
     }
-    if stack_operands <= 1 {
+    if stack_operands <= safe_pops {
         let mut new_operands = Vec::default();
         for operand in operands {
             new_operands.push(operand.clone());
@@ -76,7 +77,7 @@ fn safe_stack_pops(operands: &Vec<String>) -> (String, Vec<String>) {
     let mut new_operands = Vec::default();
     let mut op = 0;
     for operand in operands {
-        if operand == "PopStack()" && op + 1 < stack_operands {
+        if operand == "PopStack()" && op + safe_pops < stack_operands {
             prelude.push(format!("temp{} = PopStack()", op));
             new_operands.push(format!("temp{}", op));
             op += 1;
@@ -90,7 +91,16 @@ fn safe_stack_pops(operands: &Vec<String>) -> (String, Vec<String>) {
 
 // And then a function to use the above with a format string for an expression
 fn format_safe_stack_pops_expression(format: &str, operands: &Vec<String>) -> String {
-    let (prelude, new_operands) = safe_stack_pops(operands);
+    let (prelude, new_operands) = safe_stack_pops(operands, false);
+    if prelude == "" {
+        return format.format(operands);
+    }
+    format!("({}, {})", prelude, format.format(&new_operands))
+}
+
+// Now an expression that uses a macro (such as Mem4)
+fn format_safe_stack_pops_macro(format: &str, operands: &Vec<String>) -> String {
+    let (prelude, new_operands) = safe_stack_pops(operands, true);
     if prelude == "" {
         return format.format(operands);
     }
@@ -99,7 +109,7 @@ fn format_safe_stack_pops_expression(format: &str, operands: &Vec<String>) -> St
 
 // And the same but for a statement
 fn format_safe_stack_pops_statement(format: &str, operands: &Vec<String>) -> String {
-    let (prelude, new_operands) = safe_stack_pops(operands);
+    let (prelude, new_operands) = safe_stack_pops(operands, false);
     if prelude == "" {
         return format.format(operands);
     }

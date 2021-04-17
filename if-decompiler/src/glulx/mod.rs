@@ -13,7 +13,6 @@ use std::collections::BTreeMap;
 use std::io::Cursor;
 
 use bytes::Buf;
-use fnv::FnvHashMap;
 use petgraph::graph;
 
 use super::*;
@@ -23,7 +22,7 @@ pub mod opcodes;
 
 pub struct GlulxState {
     pub debug_function_data: Option<BTreeMap<u32, DebugFunctionData>>,
-    pub functions: FnvHashMap<u32, Function>,
+    pub functions: BTreeMap<u32, Function>,
     pub image: Box<[u8]>,
 }
 
@@ -31,7 +30,7 @@ impl GlulxState {
     pub fn new(image: Box<[u8]>, debug_function_data: Option<BTreeMap<u32, DebugFunctionData>>) -> GlulxState {
         GlulxState {
             debug_function_data,
-            functions: FnvHashMap::default(),
+            functions: BTreeMap::default(),
             image,
         }
     }
@@ -90,7 +89,7 @@ impl VMInstruction for Instruction {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Operand {
     Constant(u32),
     Memory(u32),

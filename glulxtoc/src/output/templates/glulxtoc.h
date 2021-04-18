@@ -36,6 +36,7 @@ extern glui32 OP_STKPEEK(glui32 arg0);
 extern void OP_STKSWAP(void);
 extern void OP_STKCOPY(glui32 arg0);
 extern void OP_STKROLL(glui32 arg0, glui32 arg1);
+extern int OP_STREAMX(int mode, glui32 val, glui32 next);
 extern glui32 OP_RANDOM(glui32 arg0);
 extern void OP_PROTECT(glui32 arg0, glui32 arg1);
 extern void OP_MZERO(glui32 arg0, glui32 arg1);

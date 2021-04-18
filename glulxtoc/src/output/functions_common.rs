@@ -75,10 +75,7 @@ impl GlulxOutput {
             OP_STKSWAP => runtime("OP_STKSWAP", &args),
             OP_STKCOPY => runtime("OP_STKCOPY", &args),
             OP_STKROLL => runtime("OP_STKROLL", &args),
-            OP_STREAMCHAR => format!("(*stream_char_handler)({} & 0xFF)", op_a),
-            OP_STREAMNUM => format!("stream_num((glsi32) {}, FALSE, 0)", op_a),
-            OP_STREAMSTR => format!("stream_string({}, 0, 0)", op_a),
-            OP_STREAMUNICHAR => format!("(*stream_unichar_handler)({})", op_a),
+            // OP_STREAMCHAR  ..= OP_STREAMUNICHAR
             OP_GESTALT => runtime("do_gestalt", &args),
             OP_DEBUGTRAP => format!("fatal_error_i(\"user debugtrap encountered.\", {})", op_a),
             OP_JUMPABS => String::new(),

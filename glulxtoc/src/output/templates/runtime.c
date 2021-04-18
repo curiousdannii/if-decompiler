@@ -242,6 +242,17 @@ void OP_STKROLL(glui32 arg0, glui32 arg1) {
     }
 }
 
+int OP_STREAMX(int mode, glui32 val, glui32 next) {
+    pc = next;
+    switch (mode) {
+        case 0: (*stream_char_handler)(val & 0xFF); break;
+        case 1: stream_num((glsi32) val, FALSE, 0); break;
+        case 2: stream_string(val, 0, 0); break;
+        case 3: (*stream_unichar_handler)(val); break;
+    }
+    return pc != next;
+}
+
 glui32 OP_RANDOM(glui32 arg0) {
     glsi32 vals0 = (glsi32) arg0;
     if (vals0 == 0) {

@@ -180,6 +180,15 @@ pub fn instruction_halts(opcode: u32) -> bool {
     }
 }
 
+// Some instructions may cause execution to resume at the next instruction at some later time
+pub fn instruction_resumes(opcode: u32) -> bool {
+    match opcode {
+        OP_CALL | OP_STREAMCHAR  ..= OP_STREAMUNICHAR | OP_SAVE | OP_SAVEUNDO
+            | OP_CALLF ..= OP_CALLFIII => true,
+        _ => false,
+    }
+}
+
 #[derive(Copy, Clone, PartialEq)]
 pub enum StoreMode {
     DoesNotStore,

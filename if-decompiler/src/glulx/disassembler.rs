@@ -249,14 +249,10 @@ impl GlulxState {
                 if let Operand::Constant(callee_addr) = instruction.operands[0] {
                     graph.edges.insert((addr, callee_addr));
                 }
-                // And if it isn't a tailcall, then add an entry point
-                if opcode != opcodes::OP_TAILCALL {
-                    entry_points.insert(instruction.next);
-                }
             }
 
-            // Add an entry point for saveundo
-            if let opcodes::OP_SAVE | opcodes::OP_SAVEUNDO = opcode {
+            // Add an entry point for instructions which may resume later
+            if opcodes::instruction_resumes(opcode) {
                 entry_points.insert(instruction.next);
             }
 

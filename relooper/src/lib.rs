@@ -19,7 +19,7 @@ https://github.com/emscripten-core/emscripten/blob/master/docs/paper.pdf
 
 use core::hash::{BuildHasher, Hash};
 use std::collections::HashMap;
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::iter::FromIterator;
 
 use fnv::{FnvHashMap, FnvHashSet};
@@ -27,16 +27,13 @@ use petgraph::prelude::*;
 use petgraph::algo;
 use petgraph::visit::{EdgeFiltered, Visitable, VisitMap};
 
-//mod graph;
-//use graph::*;
-
 #[cfg(test)]
 mod tests;
 
 // Common traits for labels
-pub trait RelooperLabel: Copy + Debug + Display + Eq + Hash + Ord {}
+pub trait RelooperLabel: Copy + Debug + Eq + Hash + Ord {}
 impl<T> RelooperLabel for T
-where T: Copy + Debug + Display + Eq + Hash + Ord {}
+where T: Copy + Debug + Eq + Hash + Ord {}
 
 type LoopId = u16;
 
@@ -78,12 +75,12 @@ pub enum BranchMode {
 
 #[derive(Debug, PartialEq)]
 pub struct LoopBlock<L: RelooperLabel> {
-    pub loop_id: u16,
+    pub loop_id: LoopId,
     pub inner: Box<ShapedBlock<L>>,
 }
 #[derive(Debug, PartialEq)]
 pub struct LoopMultiBlock<L: RelooperLabel> {
-    pub loop_id: u16,
+    pub loop_id: LoopId,
     pub handled: Vec<HandledBlock<L>>,
     pub next: Option<Box<ShapedBlock<L>>>,
 }
@@ -138,7 +135,7 @@ fn filter_edges(edge: petgraph::graph::EdgeReference<Edge>) -> bool {
 
 // The Relooper algorithm
 struct Relooper<L: RelooperLabel> {
-    counter: u16,
+    counter: LoopId,
     graph: Graph<Node<L>, Edge>,
     root: NodeIndex,
 }
@@ -294,13 +291,11 @@ impl<L: RelooperLabel> Relooper<L> {
 
     // Handle branches that merge back together
     fn process_rejoined_branches(&mut self) {
-        // Get the list of nodes in topological order and the dominators list
         let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
         let dominators = algo::dominators::simple_fast(&filtered_graph, self.root);
-        let nodes = algo::toposort(&filtered_graph, None).unwrap();
 
-        // Now in reverse order, go through the nodes, looking for those that have multiple incoming edges
-        for &node in nodes.iter().rev() {
+        // Go through the nodes, looking for those that have multiple incoming edges
+        for node in self.graph.node_indices() {
             let mut incoming_edges = Vec::default();
             for edge in self.graph.edges_directed(node, Incoming) {
                 match edge.weight() {

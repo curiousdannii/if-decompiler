@@ -12,4 +12,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+      - run: ./tests/download.sh
       - run: cargo test --package relooper
+      - run: cargo build
+      - run: ./tests/runtest.sh -f tests/glulxercise.ulx -d

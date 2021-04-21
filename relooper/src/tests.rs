@@ -681,9 +681,9 @@ fn test_stackifier_multiloop() {
     })));
 }
 
-// Test a LoopMulti with a top triple branch
 #[test]
 fn test_loopmulti() {
+    // Test a LoopMulti with a top triple branch
     let blocks = hashmap!{
         1 => vec![2, 3, 4],
         2 => vec![],
@@ -726,5 +726,79 @@ fn test_loopmulti() {
         }))),
         branches: FnvHashMap::default(),
         next: None,
+    })));
+
+    // Test a multiloop with multiple parents, internal branches, and a rejoined exit branch
+    let blocks = hashmap!{
+        0 => vec![1, 6],
+        1 => vec![2, 3],
+        2 => vec![3, 4],
+        3 => vec![4, 5],
+        4 => vec![5],
+        5 => vec![3, 6],
+        6 => vec![],
+    };
+    let result = reloop(blocks, 0);
+    assert_eq!(result, Box::new(Simple(SimpleBlock {
+        label: 0,
+        immediate: Some(Box::new(Multiple(MultipleBlock {
+            handled: vec![
+                HandledBlock {
+                    labels: vec![1],
+                    inner: Box::new(Simple(SimpleBlock {
+                        label: 1,
+                        immediate: Some(Box::new(Multiple(MultipleBlock {
+                            handled: vec![
+                                HandledBlock {
+                                    labels: vec![2],
+                                    inner: Box::new(Simple(SimpleBlock {
+                                        label: 2,
+                                        immediate: None,
+                                        branches: FnvHashMap::from_iter(vec![
+                                            (3, MergedBranchIntoMulti),
+                                            (4, MergedBranchIntoMulti),
+                                        ]),
+                                        next: None,
+                                    })),
+                                },
+                            ],
+                        }))),
+                        branches: branch_to(3, MergedBranchIntoMulti),
+                        next: Some(Box::new(LoopMulti(LoopMultiBlock {
+                            loop_id: 0,
+                            handled: vec![
+                                HandledBlock {
+                                    labels: vec![3],
+                                    inner: Box::new(Simple(SimpleBlock {
+                                        label: 3,
+                                        immediate: None,
+                                        branches: FnvHashMap::from_iter(vec![
+                                            (4, LoopContinueMulti(0)),
+                                            (5, MergedBranch),
+                                        ]),
+                                        next: None,
+                                    })),
+                                },
+                                HandledBlock {
+                                    labels: vec![4],
+                                    inner: end_node(4, Some(branch_to(5, MergedBranch))),
+                                },
+                            ],
+                            next: Some(Box::new(Simple(SimpleBlock {
+                                label: 5,
+                                immediate: None,
+                                branches: FnvHashMap::from_iter(vec![
+                                    (3, LoopContinueMulti(0)),
+                                    (6, LoopBreak(0)),
+                                ]),
+                                next: None,
+                            }))),
+                        }))),
+                    })),
+                },
+            ],
+        }))),
+        branches: branch_to(6, MergedBranch),
+        next: Some(end_node(6, None)),
     })));
 }

@@ -168,7 +168,6 @@ impl GlulxOutput {
                 output.push_str(&self.output_shaped_block(function, &mut *block.inner, indents + 1));
                 output.push_str(&format!("{}}}\n{}loop_{}_break:;\n", indent, indent, block.loop_id));
             },
-            LoopMulti(_block) => unimplemented!(),
             Multiple(block) => {
                 output.push_str(&format!("{}switch (label) {{\n", indent));
                 for handled in block.handled.iter_mut() {
@@ -353,9 +352,6 @@ impl GlulxOutput {
                                         }
                                     },
                                     Loop(_) => panic!("Should not branch directly into a LoopBlock"),
-                                    LoopMulti(_block) => {
-                                        unimplemented!()
-                                    },
                                     Multiple(block) => {
                                         let mut if_block = find_multiple(&mut block.handled, addr).unwrap();
                                         let mut output = format!("if ({}) {{\n{}{}}}", condition, self.output_shaped_block(function, &mut if_block, indents + 1), indent);

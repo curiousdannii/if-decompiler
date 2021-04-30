@@ -50,7 +50,6 @@ pub fn reloop<L: RelooperLabel, S: BuildHasher>(blocks: HashMap<L, Vec<L>, S>, f
 pub enum ShapedBlock<L: RelooperLabel> {
     Simple(SimpleBlock<L>),
     Loop(LoopBlock<L>),
-    LoopMulti(LoopMultiBlock<L>), // TODO: Output a Loop with a Multiple inside it, instead of this
     Multiple(MultipleBlock<L>),
 }
 
@@ -77,12 +76,6 @@ pub enum BranchMode {
 pub struct LoopBlock<L: RelooperLabel> {
     pub loop_id: LoopId,
     pub inner: Box<ShapedBlock<L>>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct LoopMultiBlock<L: RelooperLabel> {
-    pub loop_id: LoopId,
-    pub handled: Vec<HandledBlock<L>>,
     pub next: Option<Box<ShapedBlock<L>>>,
 }
 
@@ -349,7 +342,9 @@ impl<L: RelooperLabel> Relooper<L> {
                 let target = edge.target();
                 let mut add_branch = |target, branch| outgoing_branches.insert(self.get_basic_node_label(target), branch);
                 match edge.weight() {
-                    Edge::Forward | Edge::ForwardMulti(_)=> { immediate_entries.insert(target); },
+                    //Edge::Forward /*| Edge::ForwardMulti(_)*/ => { immediate_entries.insert(target); },
+                    //Edge::ForwardMulti(label) /*| Edge::ForwardMultiIntoMulti(label)*/ => { outgoing_branches.insert(*label, BranchMode::MergedBranchIntoMulti); },
+                    Edge::Forward | Edge::ForwardMulti(_) => { immediate_entries.insert(target); },
                     Edge::ForwardMultiIntoMulti(label) => { outgoing_branches.insert(*label, BranchMode::MergedBranchIntoMulti); },
                     Edge::Next => { next_entries.insert(target); },
                     Edge::LoopBreak(loop_id) => { add_branch(target, BranchMode::LoopBreak(*loop_id)); },
@@ -393,17 +388,19 @@ impl<L: RelooperLabel> Relooper<L> {
                     })))
                 },
                 Node::Loop(loop_id) => {
-                    assert_eq!(next_entries.len(), 0, "Loop nodes should have no next entries");
                     Some(Box::new(ShapedBlock::Loop(LoopBlock {
                         loop_id: *loop_id,
                         inner: self.output(immediate_entries).unwrap(),
+                        next: self.output(next_entries),
                     })))
                 },
                 Node::LoopMulti(loop_id) => {
                     let handled = self.output_multiple_handled(immediate_entries);
-                    Some(Box::new(ShapedBlock::LoopMulti(LoopMultiBlock {
+                    Some(Box::new(ShapedBlock::Loop(LoopBlock {
                         loop_id: *loop_id,
-                        handled,
+                        inner: Box::new(ShapedBlock::Multiple(MultipleBlock {
+                            handled,
+                        })),
                         next: self.output(next_entries),
                     })))
                 },
@@ -477,18 +474,20 @@ impl<L: RelooperLabel> Relooper<L> {
             self.graph.add_edge(loop_node, header, Edge::Forward);
         }
 
-        // If the loop parent was a Multiple, check if we can turn it into a Simple now.
-        for node in loop_parents {
-            if let Node::Multiple(_) = self.graph[node] {
-                let mut neighbors = FnvHashSet::default();
-                for edge in self.graph.edges(node) {
-                    match edge.weight() {
-                        Edge::Forward | Edge::ForwardMulti(_) => { neighbors.insert(edge.target()); },
-                        _ => {},
-                    };
-                }
-                if neighbors.len() == 1 {
-                    self.graph[node] = Node::Basic(self.get_basic_node_label(node));
+        // If the loop parent of a LoopMulti was a Multiple, check if we can turn it into a Simple now.
+        if multi_loop {
+            for node in loop_parents {
+                if let Node::Multiple(_) = self.graph[node] {
+                    let mut neighbors = FnvHashSet::default();
+                    for edge in self.graph.edges(node) {
+                        match edge.weight() {
+                            Edge::Forward | Edge::ForwardMulti(_) => { neighbors.insert(edge.target()); },
+                            _ => {},
+                        };
+                    }
+                    if neighbors.len() == 1 {
+                        self.graph[node] = Node::Basic(self.get_basic_node_label(node));
+                    }
                 }
             }
         }
@@ -504,11 +503,6 @@ impl<L: RelooperLabel> Relooper<L> {
         }
 
         // Fix edges which are branching outside the loop
-        // But we don't need to if the loop_node is at the very top
-        if loop_at_root {
-            return;
-        }
-
         let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
         let dominators = algo::dominators::simple_fast(&filtered_graph, self.graph_root);
 
@@ -518,17 +512,29 @@ impl<L: RelooperLabel> Relooper<L> {
         let mut set_next_to_undominated = false;
         let mut potential_next = None;
 
-        while let Some(node) = stack.pop() {
+        'search_loop: while let Some(node) = stack.pop() {
             if discovered.visit(node) {
                 // Mark a non-scc node as something to potentially pull out of the loop below
                 // TODO: Can we do better by measuring the 'weight' of a node and its descendants?
                 if node != loop_node && potential_next == None && !&scc.contains(&node) {
                     potential_next = Some(node);
+                    // If the root node is a loop, stop once we've found one
+                    if loop_at_root {
+                        break 'search_loop;
+                    }
                 }
 
                 let mut edges = self.graph.neighbors(node).detach();
                 'edge_loop: while let Some((edge, target)) = edges.next(&self.graph) {
                     if let Edge::Forward = self.graph[edge] {
+                        // When the root node is a loop there can't be any un-dominated nodes, so just push to the stack
+                        if loop_at_root {
+                            if !discovered.is_visited(&target) {
+                                stack.push(target);
+                            }
+                            continue 'edge_loop;
+                        }
+
                         let target_dominators = dominators.strict_dominators(target).unwrap();
                         for dom in target_dominators {
                             if dom == loop_node {
@@ -558,9 +564,14 @@ impl<L: RelooperLabel> Relooper<L> {
                 while let Some((edge, _)) = edges.next(&self.graph) {
                     self.graph[edge] = Edge::LoopBreak(loop_id);
                 }
-                // Add an edge to the loop's parent
-                let loop_parent = dominators.immediate_dominator(loop_node).unwrap();
-                self.graph.update_edge(loop_parent, node, Edge::Next);
+                // Add an edge to the loop/its parent
+                if loop_at_root {
+                    self.graph.update_edge(loop_node, node, Edge::Next);
+                }
+                else {
+                    let loop_parent = dominators.immediate_dominator(loop_node).unwrap();
+                    self.graph.update_edge(loop_parent, node, Edge::Next);
+                }
             }
         }
     }

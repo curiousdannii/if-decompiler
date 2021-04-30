@@ -340,69 +340,128 @@ fn test_nested_loops() {
     })));
 }
 
-#[test]
-fn test_nested_branches() {
-    let blocks = hashmap!{
-        0 => vec![1, 5],
-        1 => vec![2, 3],
-        2 => vec![4],
-        3 => vec![4],
-        4 => vec![8],
-        5 => vec![6, 7],
-        6 => vec![8],
-        7 => vec![8],
-        8 => vec![],
-    };
-    let result = reloop(blocks, 0);
-    assert_eq!(result, Box::new(Simple(SimpleBlock {
-        label: 0,
-        immediate: Some(Box::new(Multiple(MultipleBlock {
-            handled: vec![
-                HandledBlock {
-                    labels: vec![1],
-                    inner: Box::new(Simple(SimpleBlock {
-                        label: 1,
-                        immediate: Some(Box::new(Multiple(MultipleBlock {
-                            handled: vec![
-                                HandledBlock {
-                                    labels: vec![2],
-                                    inner: end_node(2, Some(branch_to(4, MergedBranch))),
-                                },
-                                HandledBlock {
-                                    labels: vec![3],
-                                    inner: end_node(3, Some(branch_to(4, MergedBranch))),
-                                },
-                            ],
-                        }))),
-                        next: Some(end_node(4, Some(branch_to(8, MergedBranch)))),
-                        branches: FnvHashMap::default(),
-                    })),
-                },
-                HandledBlock {
-                    labels: vec![5],
-                    inner: Box::new(Simple(SimpleBlock {
-                        label: 5,
-                        immediate: Some(Box::new(Multiple(MultipleBlock {
-                            handled: vec![
-                                HandledBlock {
-                                    labels: vec![6],
-                                    inner: end_node(6, Some(branch_to(8, MergedBranch))),
-                                },
-                                HandledBlock {
-                                    labels: vec![7],
-                                    inner: end_node(7, Some(branch_to(8, MergedBranch))),
-                                },
-                            ],
-                        }))),
-                        branches: FnvHashMap::default(),
-                        next: None,
-                    })),
-                }
-            ],
-        }))),
-        branches: FnvHashMap::default(),
-        next: Some(end_node(8, None)),
-    })));
+mod nested_branches {
+    use super::*;
+
+    #[test]
+    fn simple_nested_branches() {
+        let blocks = hashmap!{
+            0 => vec![1, 5],
+            1 => vec![2, 3],
+            2 => vec![4],
+            3 => vec![4],
+            4 => vec![8],
+            5 => vec![6, 7],
+            6 => vec![8],
+            7 => vec![8],
+            8 => vec![],
+        };
+        let result = reloop(blocks, 0);
+        assert_eq!(result, Box::new(Simple(SimpleBlock {
+            label: 0,
+            immediate: Some(Box::new(Multiple(MultipleBlock {
+                handled: vec![
+                    HandledBlock {
+                        labels: vec![1],
+                        inner: Box::new(Simple(SimpleBlock {
+                            label: 1,
+                            immediate: Some(Box::new(Multiple(MultipleBlock {
+                                handled: vec![
+                                    HandledBlock {
+                                        labels: vec![2],
+                                        inner: end_node(2, Some(branch_to(4, MergedBranch))),
+                                    },
+                                    HandledBlock {
+                                        labels: vec![3],
+                                        inner: end_node(3, Some(branch_to(4, MergedBranch))),
+                                    },
+                                ],
+                            }))),
+                            next: Some(end_node(4, Some(branch_to(8, MergedBranch)))),
+                            branches: FnvHashMap::default(),
+                        })),
+                    },
+                    HandledBlock {
+                        labels: vec![5],
+                        inner: Box::new(Simple(SimpleBlock {
+                            label: 5,
+                            immediate: Some(Box::new(Multiple(MultipleBlock {
+                                handled: vec![
+                                    HandledBlock {
+                                        labels: vec![6],
+                                        inner: end_node(6, Some(branch_to(8, MergedBranch))),
+                                    },
+                                    HandledBlock {
+                                        labels: vec![7],
+                                        inner: end_node(7, Some(branch_to(8, MergedBranch))),
+                                    },
+                                ],
+                            }))),
+                            branches: FnvHashMap::default(),
+                            next: None,
+                        })),
+                    }
+                ],
+            }))),
+            branches: FnvHashMap::default(),
+            next: Some(end_node(8, None)),
+        })));
+    }
+
+    // A small part of Glulxercise Tokenise
+    // This represents and if-else block where the if clause has two conditions with an OR
+    // (In this case it is a strict mode range check - if writing outside an array's bounds show an error, if within perform the write)
+    #[test]
+    fn if_else_with_or() {
+        let blocks = hashmap!{
+            1060 => vec![1089, 1095],
+            1089 => vec![1095, 1122],
+            1095 => vec![1130],
+            1122 => vec![1130],
+            1130 => vec![],
+        };
+        let result = reloop(blocks, 1060);
+        assert_eq!(result, Box::new(Simple(SimpleBlock {
+            label: 1060,
+            immediate: Some(Box::new(Multiple(MultipleBlock {
+                handled: vec![
+                    HandledBlock {
+                        labels: vec![1089],
+                        inner: Box::new(Simple(SimpleBlock {
+                            label: 1089,
+                            immediate: Some(Box::new(Multiple(MultipleBlock {
+                                handled: vec![
+                                    HandledBlock {
+                                        labels: vec![1122],
+                                        inner: end_node(1122, Some(branch_to(1130, MergedBranchIntoMulti))),
+                                    },
+                                ],
+                            }))),
+                            branches: branch_to(1095, MergedBranchIntoMulti),
+                            next: None,
+                        })),
+                    },
+                ],
+            }))),
+            branches: branch_to(1095, MergedBranchIntoMulti),
+            next: Some(Box::new(Loop(LoopBlock {
+                loop_id: 0,
+                inner: Box::new(Multiple(MultipleBlock {
+                    handled: vec![
+                        HandledBlock {
+                            labels: vec![1095],
+                            inner: end_node(1095, Some(branch_to(1130, LoopContinueIntoMulti(0)))),
+                        },
+                        HandledBlock {
+                            labels: vec![1130],
+                            inner: end_node(1130, None),
+                        },
+                    ],
+                })),
+                next: None,
+            }))),
+        })));
+    }
 }
 
 #[test]

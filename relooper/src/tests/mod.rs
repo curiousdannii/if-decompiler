@@ -342,7 +342,7 @@ fn test_nested_loops() {
 }
 
 #[test]
-fn test_nested_ifs() {
+fn test_nested_branches() {
     let blocks = hashmap!{
         0 => vec![1, 5],
         1 => vec![2, 3],
@@ -560,7 +560,7 @@ fn test_spaghetti() {
                                             immediate: None,
                                             branches: FnvHashMap::from_iter(vec![
                                                 (2, LoopContinue(0)),
-                                                (6, LoopBreakIntoMultiple(0)),
+                                                (6, LoopBreakIntoMulti(0)),
                                             ]),
                                             next: None,
                                         })),
@@ -572,7 +572,7 @@ fn test_spaghetti() {
                                             immediate: None,
                                             branches: FnvHashMap::from_iter(vec![
                                                 (2, LoopContinue(0)),
-                                                (7, LoopBreakIntoMultiple(0)),
+                                                (7, LoopBreakIntoMulti(0)),
                                             ]),
                                             next: None,
                                         })),
@@ -637,8 +637,8 @@ fn test_stackifier_multiloop() {
                                         label: 'D',
                                         immediate: None,
                                         branches: FnvHashMap::from_iter(vec![
-                                            ('B', LoopContinueMulti(0)),
-                                            ('C', LoopContinueMulti(0)),
+                                            ('B', LoopContinueIntoMulti(0)),
+                                            ('C', LoopContinueIntoMulti(0)),
                                         ]),
                                         next: None,
                                     })),
@@ -669,7 +669,7 @@ fn test_stackifier_multiloop() {
                     label: 'G',
                     immediate: None,
                     branches: FnvHashMap::from_iter(vec![
-                        ('B', LoopContinueMulti(0)),
+                        ('B', LoopContinueIntoMulti(0)),
                         ('H', LoopBreak(0)),
                     ]),
                     next: None,
@@ -707,13 +707,13 @@ fn test_loopmulti() {
                         handled: vec![
                             HandledBlock {
                                 labels: vec![3],
-                                inner: end_node(3, Some(branch_to(4, LoopContinueMulti(0)))),
+                                inner: end_node(3, Some(branch_to(4, LoopContinueIntoMulti(0)))),
                             },
                             HandledBlock {
                                 labels: vec![4],
                                 inner: Box::new(Simple(SimpleBlock {
                                     label: 4,
-                                    immediate: Some(end_node(5, Some(branch_to(3, LoopContinueMulti(0))))),
+                                    immediate: Some(end_node(5, Some(branch_to(3, LoopContinueIntoMulti(0))))),
                                     branches: FnvHashMap::default(),
                                     next: None,
                                 })),
@@ -773,7 +773,7 @@ fn test_loopmulti() {
                                         label: 3,
                                         immediate: None,
                                         branches: FnvHashMap::from_iter(vec![
-                                            (4, LoopContinueMulti(0)),
+                                            (4, LoopContinueIntoMulti(0)),
                                             (5, MergedBranch),
                                         ]),
                                         next: None,
@@ -788,7 +788,7 @@ fn test_loopmulti() {
                                 label: 5,
                                 immediate: None,
                                 branches: FnvHashMap::from_iter(vec![
-                                    (3, LoopContinueMulti(0)),
+                                    (3, LoopContinueIntoMulti(0)),
                                     (6, LoopBreak(0)),
                                 ]),
                                 next: None,

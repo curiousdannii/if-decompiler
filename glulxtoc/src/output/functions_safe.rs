@@ -441,9 +441,9 @@ fn function_arguments(count: u32, include_types: bool, separator: &str) -> Strin
 fn output_branchmode(branch_mode: &BranchMode, addr: u32) -> String {
     match branch_mode {
         LoopBreak(loop_id) => format!("goto loop_{}_break", loop_id),
-        LoopBreakIntoMultiple(loop_id) => format!("label = {}; goto loop_{}_break", addr, loop_id),
+        LoopBreakIntoMulti(loop_id) => format!("label = {}; goto loop_{}_break", addr, loop_id),
         LoopContinue(loop_id) => format!("goto loop_{}_continue", loop_id),
-        LoopContinueMulti(loop_id) => format!("label = {}; goto loop_{}_continue", addr, loop_id),
+        LoopContinueIntoMulti(loop_id) => format!("label = {}; goto loop_{}_continue", addr, loop_id),
         MergedBranch => format!("/* Branch to {} continues below */", addr),
         MergedBranchIntoMulti => format!("label = {} /* Branch continues below */", addr),
     }

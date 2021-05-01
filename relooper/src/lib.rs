@@ -254,13 +254,15 @@ impl<L: RelooperLabel> Relooper<L> {
                                         continue 'edge_loop;
                                     }
                                 }
+
                                 // Not dominated, so convert the edges
                                 set_next_to_undominated = true;
-                                //self.graph.update_edge(node, target, Edge::LoopBreak(loop_id));
                                 self.graph[edge] = Edge::LoopBreak(loop_id);
-                                // Add a next edge to the dominator
+                                // Add a next edge to the dominator if there isn't one already
                                 let dominator = dominators.immediate_dominator(target).unwrap();
-                                self.graph.add_edge(dominator, target, Edge::Next);
+                                if !self.graph.contains_edge(dominator, target) {
+                                    self.graph.add_edge(dominator, target, Edge::Next);
+                                }
                             }
                         }
                     }
@@ -366,8 +368,6 @@ impl<L: RelooperLabel> Relooper<L> {
                             };
                         }
                     }
-                    // Clean up the next edge - we'll re-make it later on
-                    self.graph[edge_id] = Edge::Removed;
                 }
             }
 
@@ -547,7 +547,13 @@ impl<L: RelooperLabel> Relooper<L> {
             let mut edges = self.graph.neighbors_directed(node, Incoming).detach();
             while let Some((edge_id, parent)) = edges.next(&self.graph) {
                 if loop_parent_filter(parent) {
-                    self.graph.add_edge(parent, loop_node, if multi_loop { Edge::ForwardMulti(self.get_basic_node_label(node)) } else { Edge::Forward });
+                    // As long as the edge isn't a Next/Removed, then add a new edge to the loop_node
+                    match self.graph[edge_id] {
+                        Edge::Next | Edge::Removed => {},
+                        _ => {
+                            self.graph.add_edge(parent, loop_node, if multi_loop { Edge::ForwardMulti(self.get_basic_node_label(node)) } else { Edge::Forward });
+                        },
+                    };
                     // Cannot remove edges without potentially breaking other edge indexes, so mark them as removed instead
                     self.graph[edge_id] = Edge::Removed;
                 }

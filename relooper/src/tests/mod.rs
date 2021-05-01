@@ -18,6 +18,8 @@ use super::*;
 use BranchMode::*;
 use ShapedBlock::*;
 
+mod glulxercise;
+
 fn make_btree<T: RelooperLabel>(map: HashMap<T, Vec<T>>) -> BTreeMap<T, Vec<T>> {
     let mut result = BTreeMap::default();
     for (label, branches) in map {

@@ -9,6 +9,7 @@ https://github.com/curiousdannii/if-decompiler
 
 */
 
+use std::collections::BTreeMap;
 use std::io::prelude::*;
 use std::time::Instant;
 
@@ -132,7 +133,7 @@ impl GlulxOutput {
     // Output a function
     fn output_function_body(&self, function: &Function) -> String {
         // Prepare a map of block labels and branches
-        let mut input_blocks = FnvHashMap::default();
+        let mut input_blocks = BTreeMap::default();
         for (&label, block) in &function.blocks {
             let mut branches = Vec::new();
             for branch in &block.branches {

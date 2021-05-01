@@ -9,6 +9,7 @@ https://github.com/curiousdannii/if-decompiler
 
 */
 
+use std::collections::{BTreeMap, HashMap};
 use std::iter::FromIterator;
 
 use maplit::hashmap;
@@ -16,6 +17,14 @@ use maplit::hashmap;
 use super::*;
 use BranchMode::*;
 use ShapedBlock::*;
+
+fn make_btree<T: RelooperLabel>(map: HashMap<T, Vec<T>>) -> BTreeMap<T, Vec<T>> {
+    let mut result = BTreeMap::default();
+    for (label, branches) in map {
+        result.insert(label, branches);
+    }
+    result
+}
 
 fn branch_to<T: RelooperLabel>(label: T, branch: BranchMode) -> FnvHashMap<T, BranchMode> {
     let mut res = FnvHashMap::default();
@@ -35,11 +44,11 @@ fn end_node<T: RelooperLabel>(label: T, branches: Option<FnvHashMap<T, BranchMod
 // Basic sequential blocks
 #[test]
 fn test_basic_blocks() {
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![1],
         1 => vec![2],
         2 => vec![],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
@@ -57,12 +66,12 @@ fn test_basic_blocks() {
 // Some basic loops
 #[test]
 fn test_basic_loops() {
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![1],
         1 => vec![2],
         2 => vec![3],
         3 => vec![1],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
@@ -85,13 +94,13 @@ fn test_basic_loops() {
         next: None,
     })));
 
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![1],
         1 => vec![2, 4],
         2 => vec![3],
         3 => vec![1],
         4 => vec![],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
@@ -121,13 +130,13 @@ fn test_basic_loops() {
         next: Some(end_node(4, None)),
     })));
 
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![1],
         1 => vec![2],
         2 => vec![3, 4],
         3 => vec![1],
         4 => vec![],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
@@ -158,10 +167,10 @@ fn test_basic_loops() {
     })));
 
     // Test a self loop
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![0, 1],
         1 => vec![],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Loop(LoopBlock {
         loop_id: 0,
@@ -178,13 +187,13 @@ fn test_basic_loops() {
     })));
 
     // Multiple breaks to a dominated node from a loop (a little excerpt from the Glulxercise Tokenise test)
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         749 => vec![756],
         756 => vec![762, 786],
         762 => vec![777, 786],
         777 => vec![756],
         786 => vec![],
-    };
+    });
     let result = reloop(blocks, 749);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 749,
@@ -225,11 +234,11 @@ fn test_basic_loops() {
 // Some basic ifs
 #[test]
 fn test_basic_ifs() {
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![1, 2],
         1 => vec![],
         2 => vec![],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
@@ -249,12 +258,12 @@ fn test_basic_ifs() {
         next: None,
     })));
 
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![1, 2],
         1 => vec![3],
         2 => vec![3],
         3 => vec![],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
@@ -274,11 +283,11 @@ fn test_basic_ifs() {
         next: Some(end_node(3, None)),
     })));
 
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![1, 2],
         1 => vec![2],
         2 => vec![],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
@@ -297,12 +306,12 @@ fn test_basic_ifs() {
 
 #[test]
 fn test_nested_loops() {
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![1, 3],
         1 => vec![2],
         2 => vec![0, 1],
         3 => vec![],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Loop(LoopBlock {
         loop_id: 0,
@@ -345,7 +354,7 @@ mod nested_branches {
 
     #[test]
     fn simple_nested_branches() {
-        let blocks = hashmap!{
+        let blocks = make_btree(hashmap!{
             0 => vec![1, 5],
             1 => vec![2, 3],
             2 => vec![4],
@@ -355,7 +364,7 @@ mod nested_branches {
             6 => vec![8],
             7 => vec![8],
             8 => vec![],
-        };
+        });
         let result = reloop(blocks, 0);
         assert_eq!(result, Box::new(Simple(SimpleBlock {
             label: 0,
@@ -413,13 +422,13 @@ mod nested_branches {
     // (In this case it is a strict mode range check - if writing outside an array's bounds show an error, if within perform the write)
     #[test]
     fn if_else_with_or() {
-        let blocks = hashmap!{
+        let blocks = make_btree(hashmap!{
             1060 => vec![1089, 1095],
             1089 => vec![1095, 1122],
             1095 => vec![1130],
             1122 => vec![1130],
             1130 => vec![],
-        };
+        });
         let result = reloop(blocks, 1060);
         assert_eq!(result, Box::new(Simple(SimpleBlock {
             label: 1060,
@@ -466,13 +475,13 @@ mod nested_branches {
 
 #[test]
 fn test_loop_in_branch() {
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![1, 2],
         1 => vec![4],
         2 => vec![3],
         3 => vec![2, 4],
         4 => vec![],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
@@ -512,7 +521,7 @@ fn test_loop_in_branch() {
 
 #[test]
 fn test_spaghetti() {
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![1, 2],
         1 => vec![3, 4],
         2 => vec![5, 6],
@@ -522,7 +531,7 @@ fn test_spaghetti() {
         6 => vec![8],
         7 => vec![],
         8 => vec![],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
@@ -585,7 +594,7 @@ fn test_spaghetti() {
         }))),
     })));
 
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![1, 2, 3],
         1 => vec![6],
         2 => vec![4, 5],
@@ -594,7 +603,7 @@ fn test_spaghetti() {
         5 => vec![2, 7],
         6 => vec![],
         7 => vec![],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,
@@ -669,7 +678,7 @@ fn test_spaghetti() {
 // The example from the Stackifier article
 #[test]
 fn test_stackifier_multiloop() {
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         'A' => vec!['B', 'C'],
         'B' => vec!['D', 'E'],
         'C' => vec!['E'],
@@ -678,7 +687,7 @@ fn test_stackifier_multiloop() {
         'F' => vec!['G'],
         'G' => vec!['B', 'H'],
         'H' => vec![],
-    };
+    });
     let result = reloop(blocks, 'A');
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 'A',
@@ -746,13 +755,13 @@ fn test_stackifier_multiloop() {
 #[test]
 fn test_loopmulti() {
     // Test a LoopMulti with a top triple branch
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         1 => vec![2, 3, 4],
         2 => vec![],
         3 => vec![4],
         4 => vec![5],
         5 => vec![3],
-    };
+    });
     let result = reloop(blocks, 1);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 1,
@@ -793,7 +802,7 @@ fn test_loopmulti() {
     })));
 
     // Test a multiloop with multiple parents, internal branches, and a rejoined exit branch
-    let blocks = hashmap!{
+    let blocks = make_btree(hashmap!{
         0 => vec![1, 6],
         1 => vec![2, 3],
         2 => vec![3, 4],
@@ -801,7 +810,7 @@ fn test_loopmulti() {
         4 => vec![5],
         5 => vec![3, 6],
         6 => vec![],
-    };
+    });
     let result = reloop(blocks, 0);
     assert_eq!(result, Box::new(Simple(SimpleBlock {
         label: 0,

@@ -17,8 +17,8 @@ https://github.com/emscripten-core/emscripten/blob/master/docs/paper.pdf
 
 #![forbid(unsafe_code)]
 
-use core::hash::{BuildHasher, Hash};
-use std::collections::HashMap;
+use core::hash::Hash;
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 
@@ -38,7 +38,7 @@ where T: Copy + Debug + Eq + Hash + Ord {}
 type LoopId = u16;
 
 // The Relooper accepts a map of block labels to the labels each block can branch to
-pub fn reloop<L: RelooperLabel, S: BuildHasher>(blocks: HashMap<L, Vec<L>, S>, first_label: L) -> Box<ShapedBlock<L>> {
+pub fn reloop<L: RelooperLabel>(blocks: BTreeMap<L, Vec<L>>, first_label: L) -> Box<ShapedBlock<L>> {
     let mut relooper = Relooper::new(blocks, first_label);
     relooper.process_loops();
     relooper.process_rejoined_branches();
@@ -138,9 +138,7 @@ struct Relooper<L: RelooperLabel> {
 }
 
 impl<L: RelooperLabel> Relooper<L> {
-    fn new<S>(blocks: HashMap<L, Vec<L>, S>, root_label: L) -> Relooper<L>
-    where S: BuildHasher
-    {
+    fn new(blocks: BTreeMap<L, Vec<L>>, root_label: L) -> Relooper<L> {
         let mut graph = Graph::new();
         let mut nodes = FnvHashMap::default();
 
@@ -511,6 +509,18 @@ impl<L: RelooperLabel> Relooper<L> {
     fn get_basic_node_label(&self, id: NodeIndex) -> L {
         match self.graph[id] {
             Node::Basic(label) | Node::Multiple(label) => label,
+            Node::Loop(_) => {
+                let mut edges = self.graph.neighbors(id).detach();
+                while let Some((edge, target)) = edges.next(&self.graph) {
+                    if let Edge::Forward = self.graph[edge] {
+                        match self.graph[target] {
+                            Node::Basic(label) | Node::Multiple(label) => return label,
+                            other => panic!("Cannot get label of node inside loop: {:?}", other),
+                        }
+                    }
+                }
+                panic!("No inner node within loop node: {:?}", self.graph[id]);
+            },
             other => panic!("Cannot get label of node: {:?}", other),
         }
     }

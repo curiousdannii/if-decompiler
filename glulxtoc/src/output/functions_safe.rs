@@ -331,12 +331,44 @@ impl GlulxOutput {
                 match target {
                     Dynamic => panic!("Dynamic branch in safe function at {:?}", instruction.addr),
                     Absolute(addr) => {
+                        // A simple if branch
+                        if let Some(MergedBranch) = simple_block.branches.get(&addr) {
+                            if let Some(immediate_block) = simple_block.immediate.as_deref_mut() {
+                                if let Multiple(ref mut multiple_block) = immediate_block {
+                                    if multiple_block.handled.len() == 1 {
+                                        let branch_a_block_opt = find_multiple(&mut multiple_block.handled, instruction.next);
+                                        if let Some(mut branch_a_block) = branch_a_block_opt {
+                                            let output = format!("if (!({})) {{\n{}{}}}", condition, self.output_shaped_block(function, &mut branch_a_block, indents + 1), indent);
+                                            simple_block.immediate = None;
+                                            return output;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // Look in the block's branches to see if we break, continue, etc
                         if let Some(branch_mode) = simple_block.branches.get(&addr) {
                             return match instruction.opcode {
                                 OP_JUMP => format!("{};", output_branchmode(branch_mode, addr)),
-                                OP_JUMPABS => unimplemented!(),
-                                _ => format!("if ({}) {{{};}}", condition, output_branchmode(branch_mode, addr)),
+                                OP_JUMPABS => unimplemented!("OP_JUMPABS branch not yet supported"),
+                                _ => {
+                                    let mut output = format!("if ({}) {{{};}}", condition, output_branchmode(branch_mode, addr));
+                                    // See if we can extract the next block out of an immediate Multiple
+                                    if let Some(immediate_block) = simple_block.immediate.as_deref_mut() {
+                                        if let Multiple(ref mut multiple_block) = immediate_block {
+                                            if multiple_block.handled.len() == 1 {
+                                                let branch_a_block_opt = find_multiple(&mut multiple_block.handled, instruction.next);
+                                                if let Some(mut branch_a_block) = branch_a_block_opt {
+                                                    output.push('\n');
+                                                    output.push_str(&self.output_shaped_block(function, &mut branch_a_block, indents));
+                                                    simple_block.immediate = None;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    output
+                                },
                             };
                         }
 
@@ -351,7 +383,7 @@ impl GlulxOutput {
                                                 simple_block.immediate = None;
                                                 output
                                             },
-                                            OP_JUMPABS => unimplemented!(),
+                                            OP_JUMPABS => unimplemented!("OP_JUMPABS branch not yet supported"),
                                             _ => panic!("Should not branch directly into a SimpleBlock"),
                                         }
                                     },
@@ -373,7 +405,7 @@ impl GlulxOutput {
                     },
                     Return(val) => match instruction.opcode {
                         OP_JUMP => format!("return {};", val),
-                        OP_JUMPABS => unimplemented!(),
+                        OP_JUMPABS => unimplemented!("OP_JUMPABS branch not yet supported"),
                         _ => format!("if ({}) {{ return {}; }}", condition, val),
                     },
                 }

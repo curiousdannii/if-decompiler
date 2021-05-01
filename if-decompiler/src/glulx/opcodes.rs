@@ -227,8 +227,14 @@ pub fn function_safety(instructions: &Vec<Instruction>) -> FunctionSafety {
             }
 
             // Branches to non-constants are unsafe
-            OP_JUMP ..= OP_JLEU | OP_CATCH | OP_JUMPABS | OP_JFEQ ..= OP_JISINF => match instruction.operands.last().unwrap() {
+            OP_JUMP ..= OP_JLEU | OP_JUMPABS | OP_JFEQ ..= OP_JISINF => match instruction.operands.last().unwrap() {
                 Operand::Constant(_) => continue,
+                _ => return UnsafeDynamicBranches,
+            }
+
+            // CATCH could be unsafe or extra unsafe
+            OP_CATCH => match instruction.operands.last().unwrap() {
+                Operand::Constant(_) => result = Unsafe,
                 _ => return UnsafeDynamicBranches,
             }
 

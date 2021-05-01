@@ -30,7 +30,7 @@ pub struct DebugFunctionData {
 // Unsafe functions need to be compiled such that they can be serialised and restored
 // UnsafeDynamicBranches functions have dynamic branches and need even more special care
 // SafetyTBD functions have not yet been determined. At the end of decompilation any remaining SafetyTBD functions will be assumed safe.
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FunctionSafety {
     Unsafe,
     UnsafeDynamicBranches,
@@ -133,7 +133,7 @@ pub fn calculate_basic_blocks<I: VMInstruction>(instructions: Vec<I>, entry_poin
     blocks
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BranchTarget {
     Dynamic,
     Absolute(u32),

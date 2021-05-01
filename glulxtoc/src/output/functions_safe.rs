@@ -56,7 +56,7 @@ impl GlulxOutput {
                 break;
             }
 
-            if function.safety == FunctionSafety::Unsafe {
+            if function.safety != FunctionSafety::SafetyTBD {
                 continue;
             }
 
@@ -168,6 +168,9 @@ impl GlulxOutput {
                 output.push_str(&format!("{}while (1) {{\n{}    loop_{}_continue:\n", indent, indent, block.loop_id));
                 output.push_str(&self.output_shaped_block(function, &mut *block.inner, indents + 1));
                 output.push_str(&format!("{}}}\n{}loop_{}_break:;\n", indent, indent, block.loop_id));
+                if let Some(next) = block.next.as_deref_mut() {
+                    output.push_str(&self.output_shaped_block(function, next, indents));
+                }
             },
             Multiple(block) => {
                 output.push_str(&format!("{}switch (label) {{\n", indent));
@@ -259,7 +262,7 @@ impl GlulxOutput {
     fn output_call_safe(&self, instruction: &Instruction, mut args: Vec<String>, is_callf: bool) -> String {
         let callee_addr = match instruction.operands[0] {
             Constant(addr) => addr,
-            _ => panic!("Dynamic callf not supported"),
+            _ => panic!("Dynamic callf not supported at {:?}", instruction.addr),
         };
         let callee = self.state.functions.get(&callee_addr).unwrap();
         let provided_args = args.len();
@@ -326,7 +329,7 @@ impl GlulxOutput {
             None => format!("{};", condition),
             Some(target) => {
                 match target {
-                    Dynamic => panic!("Dynamic branch in safe function"),
+                    Dynamic => panic!("Dynamic branch in safe function at {:?}", instruction.addr),
                     Absolute(addr) => {
                         // Look in the block's branches to see if we break, continue, etc
                         if let Some(branch_mode) = simple_block.branches.get(&addr) {

@@ -13,8 +13,6 @@ use std::collections::BTreeMap;
 use std::io::prelude::*;
 use std::time::Instant;
 
-use fnv::FnvHashMap;
-
 use if_decompiler::*;
 use glulx::*;
 use Operand::*;
@@ -42,6 +40,7 @@ impl GlulxOutput {
 #include <math.h>
 
 #define CALL_FUNC(code) (oldsp = stackptr, oldvsb = valstackbase, res = code, stackptr = oldsp, valstackbase = oldvsb, res)
+#define CALL_FUNC_VARARGS(code, pre_pushed_args) (oldsp = stackptr, res = code, stackptr = oldsp - pre_pushed_args * 4, res)
 
 ")?;
         write!(header_file, "#include \"glk.h\"
@@ -49,36 +48,28 @@ impl GlulxOutput {
 ")?;
 
         // Output the function bodies
-        let mut safe_funcs: FnvHashMap<u32, Vec<u32>> = FnvHashMap::default();
         let mut highest_arg_count = 0;
-        for (addr, function) in &self.state.functions {
-            if self.disassemble_mode {
-                break;
+        let mut varargs_functions = Vec::new();
+        for addr in &self.safe_functions {
+            let function = &self.state.functions[addr];
+            if function.locals > highest_arg_count {
+                highest_arg_count = function.locals;
+            }
+            if function.argument_mode == FunctionArgumentMode::Stack {
+                varargs_functions.push(*addr);
             }
 
-            if function.safety != FunctionSafety::SafetyTBD {
-                continue;
-            }
-
-            // Add to the list of safe_funcs
-            match safe_funcs.get_mut(&function.locals) {
-                Some(vec) => {
-                    vec.push(*addr);
-                },
-                None => {
-                    if function.locals > highest_arg_count {
-                        highest_arg_count = function.locals;
-                    }
-                    safe_funcs.insert(function.locals, vec![*addr]);
-                },
-            };
-            let args_list = function_arguments(function.locals, true, ",");
+            let args_list = if function.argument_mode == FunctionArgumentMode::Stack { String::from("void") } else { function_arguments(function.locals, true, ",") };
             let function_spec = format!("glui32 VM_FUNC_{}({})", addr, args_list);
             let name_comment = self.state.debug_function_data.as_ref().map_or(String::new(), |functions| format!("// VM Function {} ({})\n", addr, functions.get(addr).unwrap().name));
 
             writeln!(code_file, "{}{} {{
-    glui32 arg, label, oldsp, oldvsb, res, temp0, temp1, temp2, temp3, temp4, temp5;
-    valstackbase = stackptr;", name_comment, function_spec)?;
+    glui32 arg, label, oldsp, oldvsb, res, temp0, temp1, temp2, temp3, temp4, temp5;", name_comment, function_spec)?;
+            if function.argument_mode == FunctionArgumentMode::Stack {
+                writeln!(code_file, "    glui32 {};", function_arguments(function.locals, false, ","))?;
+            } else {
+                writeln!(code_file, "    valstackbase = stackptr;")?;
+            }
             code_file.write(self.output_function_body(function).as_bytes())?;
             writeln!(code_file, "    return 0;
 }}
@@ -91,16 +82,33 @@ impl GlulxOutput {
         // Output the VM_FUNC_IS_SAFE function
         writeln!(code_file, "int VM_FUNC_IS_SAFE(glui32 addr) {{
     switch (addr) {{")?;
-        for (_, funcs) in &safe_funcs {
-            for row in funcs[..].chunks(5) {
-                write!(code_file, "        ")?;
-                let mut row_str = String::new();
-                for addr in row {
-                    row_str.push_str(&format!("case {}: ", addr));
-                }
-                row_str.truncate(row_str.len() - 1);
-                writeln!(code_file, "{}", row_str)?;
+        for row in self.safe_functions.chunks(5) {
+            write!(code_file, "        ")?;
+            let mut row_str = String::new();
+            for addr in row {
+                row_str.push_str(&format!("case {}: ", addr));
             }
+            row_str.truncate(row_str.len() - 1);
+            writeln!(code_file, "{}", row_str)?;
+        }
+        writeln!(code_file, "            return 1;
+        default:
+            return 0;
+    }}
+}}
+")?;
+
+        // Output the VM_FUNC_IS_SAFE_VARARGS function
+        writeln!(code_file, "int VM_FUNC_IS_SAFE_VARARGS(glui32 addr) {{
+    switch (addr) {{")?;
+        for row in varargs_functions.chunks(5) {
+            write!(code_file, "        ")?;
+            let mut row_str = String::new();
+            for addr in row {
+                row_str.push_str(&format!("case {}: ", addr));
+            }
+            row_str.truncate(row_str.len() - 1);
+            writeln!(code_file, "{}", row_str)?;
         }
         writeln!(code_file, "            return 1;
         default:
@@ -111,15 +119,19 @@ impl GlulxOutput {
 
         // Output the VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS function
         writeln!(code_file, "glui32 VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(glui32 addr, glui32 count) {{
-    {};", function_arguments(highest_arg_count, true, ";"))?;
+    {};
+    if (VM_FUNC_IS_SAFE_VARARGS(addr)) {{
+        PushStack(count);
+    }}
+    else {{", function_arguments(highest_arg_count, true, ";"))?;
         for i in 0..highest_arg_count {
-            writeln!(code_file, "    if (count > {}) {{ l{} = PopStack(); }}", i, i)?;
+            writeln!(code_file, "        if (count > {}) {{ l{} = PopStack(); }}", i, i)?;
         }
-        writeln!(code_file, "    switch (addr) {{")?;
-        for (count, funcs) in &safe_funcs {
-            for addr in funcs {
-                writeln!(code_file, "        case {}: return VM_FUNC_{}({});", addr, addr, function_arguments(*count, false, ","))?;
-            }
+        writeln!(code_file, "    }}\n    switch (addr) {{")?;
+        for addr in &self.safe_functions {
+            let function = &self.state.functions[addr];
+            let args_list = if function.argument_mode == FunctionArgumentMode::Stack { String::new() } else { function_arguments(function.locals, false, ",") };
+            writeln!(code_file, "        case {}: return VM_FUNC_{}({});", addr, addr, args_list)?;
         }
         write!(code_file, "        default: fatal_error_i(\"VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS called with non-safe function address:\", addr);
     }}
@@ -267,6 +279,26 @@ impl GlulxOutput {
         let callee = self.state.functions.get(&callee_addr).unwrap();
         let provided_args = args.len();
         let callee_args = callee.locals as usize;
+
+        // Vararg functions
+        if callee.argument_mode == FunctionArgumentMode::Stack {
+            let (processed_args, pre_pushed_args) = match instruction.opcode {
+                opcodes::OP_CALLFI ..= opcodes::OP_CALLFIII => {
+                    let (prelude, new_operands) = safe_stack_pops(&args, true);
+                    let pushed_args: Vec<String> = new_operands.iter().rev().map(|arg| format!("PushStack({})", arg)).collect();
+                    if prelude == "" {
+                        (format!("{}, ", pushed_args.join(", ")), 0)
+                    }
+                    else {
+                        (format!("{}, {}, ", prelude, pushed_args.join(", ")), 0)
+                    }
+                },
+                _ => {
+                    (String::new(), provided_args)
+                },
+            };
+            return format!("CALL_FUNC_VARARGS(({}PushStack({}), VM_FUNC_{}()), {})", processed_args, provided_args, callee_addr, pre_pushed_args);
+        }
 
         // Account for extra args
         if provided_args > callee_args {

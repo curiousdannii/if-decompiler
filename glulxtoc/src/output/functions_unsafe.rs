@@ -38,10 +38,8 @@ void execute_loop(void) {{
         switch (pc) {{")?;
 
         // Output the function bodies
-        for (addr, function) in &self.state.functions {
-            if !self.disassemble_mode && function.safety == SafetyTBD {
-                continue;
-            }
+        for addr in &self.unsafe_functions {
+            let function = &self.state.functions[addr];
 
             if function.safety == UnsafeDynamicBranches && self.state.debug_function_data.is_none() && !self.have_warned_about_dynamic_branches {
                 println!("Warning ❗ This Glulx file features dynamic branches or jumps; please provide an Inform debug file.");

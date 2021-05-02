@@ -33,9 +33,9 @@ impl GlulxState {
         // If we have debug file data, use it to disassemble all the functions
         if let Some(functions) = &self.debug_function_data {
             for (&addr, func) in functions {
-                // Skip the object byte
-                cursor.set_position(addr as u64 + 1);
-                self.functions.insert(func.addr, self.disassemble_function(&mut cursor, &mut graph, addr, Some(func.len)));
+                cursor.set_position(addr as u64);
+                let function_type = cursor.get_u8();
+                self.functions.insert(func.addr, self.disassemble_function(&mut cursor, &mut graph, addr, Some(func.len), function_type));
             }
             return graph;
         }
@@ -55,7 +55,7 @@ impl GlulxState {
 
                 // Functions
                 0xC0 | 0xC1 => {
-                    self.functions.insert(addr, self.disassemble_function(&mut cursor, &mut graph, addr, None));
+                    self.functions.insert(addr, self.disassemble_function(&mut cursor, &mut graph, addr, None, object_type));
                 },
 
                 // Strings - just skip past them for now!
@@ -185,7 +185,13 @@ impl GlulxState {
         table
     }
 
-    fn disassemble_function(&self, cursor: &mut Cursor<&Box<[u8]>>, graph: &mut DisassemblyGraph, addr: u32, len: Option<u32>) -> Function {
+    fn disassemble_function(&self, cursor: &mut Cursor<&Box<[u8]>>, graph: &mut DisassemblyGraph, addr: u32, len: Option<u32>, function_mode: u8) -> Function {
+        let argument_mode = match function_mode {
+            0xC0 => FunctionArgumentMode::Stack,
+            0xC1 => FunctionArgumentMode::Locals,
+            _ => unreachable!(),
+        };
+
         // Parse the locals formats
         let mut locals = 0;
         loop {
@@ -297,6 +303,7 @@ impl GlulxState {
 
         Function {
             addr,
+            argument_mode,
             blocks,
             graph_node: graph.graph.add_node(addr),
             locals,

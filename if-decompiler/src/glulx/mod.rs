@@ -62,10 +62,17 @@ impl VirtualMachine for GlulxState {
 
 pub struct Function {
     pub addr: u32,
+    pub argument_mode: FunctionArgumentMode,
     pub blocks: BTreeMap<u32, BasicBlock<Instruction>>,
     pub graph_node: graph::NodeIndex,
     pub locals: u32,
     pub safety: FunctionSafety,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum FunctionArgumentMode {
+    Stack,
+    Locals,
 }
 
 pub struct Instruction {

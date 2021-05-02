@@ -15,6 +15,7 @@ https://github.com/curiousdannii/if-decompiler
 
 // functions_safe.c
 extern int VM_FUNC_IS_SAFE(glui32 addr);
+extern int VM_FUNC_IS_SAFE_VARARGS(glui32 addr);
 extern glui32 VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(glui32 addr, glui32 count);
 
 // image.c

@@ -15,7 +15,8 @@ use std::path::PathBuf;
 
 use dyn_fmt::AsStrFormatExt;
 
-use if_decompiler::glulx::GlulxState;
+use if_decompiler::*;
+use glulx::GlulxState;
 
 mod functions_common;
 mod functions_safe;
@@ -29,11 +30,38 @@ pub struct GlulxOutput {
     pub name: String,
     pub out_dir: PathBuf,
     pub ramstart: u32,
+    pub safe_functions: Vec<u32>,
     pub state: GlulxState,
+    pub unsafe_functions: Vec<u32>,
     pub workspace_dir: PathBuf,
 }
 
 impl GlulxOutput {
+    pub fn new(disassemble_mode: bool, name: String, out_dir: PathBuf, state: GlulxState, workspace_dir: PathBuf) -> GlulxOutput {
+        let ramstart = state.read_addr(8);
+        let mut safe_functions = Vec::new();
+        let mut unsafe_functions = Vec::new();
+        for (&addr, function) in &state.functions {
+            if !disassemble_mode && function.safety == FunctionSafety::SafetyTBD {
+                safe_functions.push(addr);
+            }
+            else {
+                unsafe_functions.push(addr);
+            }
+        }
+        GlulxOutput {
+            disassemble_mode,
+            have_warned_about_dynamic_branches: false,
+            name,
+            out_dir,
+            ramstart,
+            safe_functions,
+            state,
+            unsafe_functions,
+            workspace_dir,
+        }
+    }
+
     pub fn output(&mut self) -> io::Result<()> {
         // Make the output directory if necessary
         fs::create_dir_all(&self.out_dir)?;

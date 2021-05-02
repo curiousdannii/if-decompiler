@@ -93,16 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Time disassembling the storyfile: {:?}", duration);
 
     // Output the C files
-    let ramstart = decompiler.read_addr(8);
-    let mut output = output::GlulxOutput {
-        disassemble_mode: args.disassemble,
-        have_warned_about_dynamic_branches: false,
-        name,
-        out_dir,
-        ramstart,
-        state: decompiler,
-        workspace_dir,
-    };
+    let mut output = output::GlulxOutput::new(args.disassemble, name, out_dir, decompiler, workspace_dir);
     output.output()?;
 
     let duration = start.elapsed();

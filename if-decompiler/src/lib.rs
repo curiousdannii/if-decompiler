@@ -37,32 +37,39 @@ pub enum FunctionSafety {
     SafetyTBD,
 }
 
-// A struct for passing around a graph of function dependencies
-pub struct DisassemblyGraph {
-    pub edges: FnvHashSet<(u32, u32)>,
-    pub graph: graph::Graph<u32, ()>,
-    pub unsafe_functions: Vec<u32>,
-}
-
 // Now a trait for generalising over our VMs
 pub trait VirtualMachine {
-    fn get_function_graph_node(&self, addr: u32) -> graph::NodeIndex;
+    fn get_functions(&self) -> FnvHashMap<u32, FunctionSafety>;
     fn mark_function_as_unsafe(&mut self, addr: u32);
 
-    fn mark_all_unsafe_functions(&mut self, mut graph: DisassemblyGraph) {
-        // First add the graph edges
-        graph.graph.extend_with_edges(graph.edges.iter().map(|(caller_addr, callee_addr)| {
-            let caller_node = self.get_function_graph_node(*caller_addr);
-            let callee_node = self.get_function_graph_node(*callee_addr);
+    fn mark_all_unsafe_functions(&mut self, edges: FnvHashSet<(u32, u32)>) {
+        let mut graph: graph::Graph<u32, ()> = graph::Graph::new();
+
+        // Add the graph nodes
+        let functions = self.get_functions();
+        let mut function_nodes = FnvHashMap::default();
+        let mut unsafe_functions = Vec::new();
+        for (addr, safety) in functions {
+            let node = graph.add_node(addr);
+            function_nodes.insert(addr, node);
+            if safety != FunctionSafety::SafetyTBD {
+                unsafe_functions.push(node);
+            }
+        }
+
+        // Then add the graph edges
+        graph.extend_with_edges(edges.iter().map(|(caller_addr, callee_addr)| {
+            let caller_node = function_nodes[caller_addr];
+            let callee_node = function_nodes[callee_addr];
             // The direction must be callee->caller, as we'll change the caller's safety if the callee is unsafe
             (callee_node, caller_node)
         }));
 
         // Now walk the function graph, marking each caller as Unsafe
-        let mut dfs = visit::Dfs::empty(&graph.graph);
-        dfs.stack = graph.unsafe_functions.iter().map(|addr| self.get_function_graph_node(*addr)).collect();
-        while let Some(node_index) = dfs.next(&graph.graph) {
-            let addr = graph.graph[node_index];
+        let mut dfs = visit::Dfs::empty(&graph);
+        dfs.stack = unsafe_functions;
+        while let Some(node_index) = dfs.next(&graph) {
+            let addr = graph[node_index];
             self.mark_function_as_unsafe(addr);
         }
     }

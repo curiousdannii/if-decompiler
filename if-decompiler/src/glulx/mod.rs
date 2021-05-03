@@ -13,7 +13,6 @@ use std::collections::BTreeMap;
 use std::io::Cursor;
 
 use bytes::Buf;
-use petgraph::graph;
 
 use super::*;
 
@@ -36,8 +35,8 @@ impl GlulxState {
     }
 
     pub fn decompile_rom(&mut self) {
-        let graph = self.disassemble();
-        self.mark_all_unsafe_functions(graph);
+        let edges = self.disassemble();
+        self.mark_all_unsafe_functions(edges);
     }
 
     pub fn read_addr(&self, addr: u32) -> u32 {
@@ -48,8 +47,12 @@ impl GlulxState {
 }
 
 impl VirtualMachine for GlulxState {
-    fn get_function_graph_node(&self, addr: u32) -> graph::NodeIndex {
-        self.functions.get(&addr).unwrap().graph_node
+    fn get_functions(&self) -> FnvHashMap<u32, FunctionSafety> {
+        let mut res = FnvHashMap::default();
+        for (&addr, function) in &self.functions {
+            res.insert(addr, function.safety);
+        }
+        res
     }
 
     fn mark_function_as_unsafe(&mut self, addr: u32) {
@@ -64,7 +67,6 @@ pub struct Function {
     pub addr: u32,
     pub argument_mode: FunctionArgumentMode,
     pub blocks: BTreeMap<u32, BasicBlock<Instruction>>,
-    pub graph_node: graph::NodeIndex,
     pub locals: u32,
     pub safety: FunctionSafety,
 }

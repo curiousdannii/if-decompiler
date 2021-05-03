@@ -10,19 +10,14 @@ https://github.com/curiousdannii/if-decompiler
 */
 
 use fnv::FnvHashSet;
-use petgraph::graph::Graph;
 
 use super::*;
 
 impl GlulxState {
-    pub fn disassemble(&mut self) -> DisassemblyGraph {
+    pub fn disassemble(&mut self) -> FnvHashSet<(u32, u32)> {
         let decoding_table = self.parse_string_decoding_table();
 
-        let mut graph = DisassemblyGraph {
-            edges: FnvHashSet::default(),
-            graph: Graph::new(),
-            unsafe_functions: Vec::new(),
-        };
+        let mut edges = FnvHashSet::default();
 
         let ram_start = self.read_addr(8) as u64;
         let decoding_table_addr = self.read_addr(28);
@@ -35,9 +30,9 @@ impl GlulxState {
             for (&addr, func) in functions {
                 cursor.set_position(addr as u64);
                 let function_type = cursor.get_u8();
-                self.functions.insert(func.addr, self.disassemble_function(&mut cursor, &mut graph, addr, Some(func.len), function_type));
+                self.functions.insert(func.addr, self.disassemble_function(&mut cursor, &mut edges, addr, Some(func.len), function_type));
             }
-            return graph;
+            return edges;
         }
 
         // Otherwise parse the file manually
@@ -55,7 +50,7 @@ impl GlulxState {
 
                 // Functions
                 0xC0 | 0xC1 => {
-                    self.functions.insert(addr, self.disassemble_function(&mut cursor, &mut graph, addr, None, object_type));
+                    self.functions.insert(addr, self.disassemble_function(&mut cursor, &mut edges, addr, None, object_type));
                 },
 
                 // Strings - just skip past them for now!
@@ -119,8 +114,8 @@ impl GlulxState {
             }
         };
 
-        // Return the graph
-        graph
+        // Return the list of edges
+        edges
     }
 
     // Parse the string decoding table, but only so that we can ignore compressed strings
@@ -185,7 +180,7 @@ impl GlulxState {
         table
     }
 
-    fn disassemble_function(&self, cursor: &mut Cursor<&Box<[u8]>>, graph: &mut DisassemblyGraph, addr: u32, len: Option<u32>, function_mode: u8) -> Function {
+    fn disassemble_function(&self, cursor: &mut Cursor<&Box<[u8]>>, edges: &mut FnvHashSet<(u32, u32)>, addr: u32, len: Option<u32>, function_mode: u8) -> Function {
         let argument_mode = match function_mode {
             0xC0 => FunctionArgumentMode::Stack,
             0xC1 => FunctionArgumentMode::Locals,
@@ -250,10 +245,10 @@ impl GlulxState {
             }
             let opcode = instruction.opcode;
 
-            // If this instruction calls, then add it to the graph
+            // If this instruction calls, then add it to the edges list
             if opcodes::instruction_calls(opcode) {
                 if let Operand::Constant(callee_addr) = instruction.operands[0] {
-                    graph.edges.insert((addr, callee_addr));
+                    edges.insert((addr, callee_addr));
                 }
             }
 
@@ -295,9 +290,6 @@ impl GlulxState {
 
         // Add to the DisassemblyGraph's list of unsafe functions
         let safety = opcodes::function_safety(&instructions);
-        if safety != FunctionSafety::SafetyTBD {
-            graph.unsafe_functions.push(addr);
-        }
 
         let blocks = calculate_basic_blocks(instructions, entry_points, exit_branches);
 
@@ -305,7 +297,6 @@ impl GlulxState {
             addr,
             argument_mode,
             blocks,
-            graph_node: graph.graph.add_node(addr),
             locals,
             safety,
         }

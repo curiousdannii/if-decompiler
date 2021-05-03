@@ -216,7 +216,7 @@ fn test_tokenise() {
         next: None,
     }));
 
-    let loop840branch = branch_to(892, MergedBranchIntoMulti);
+    let loop840branch = branch_to(892, LoopBreakIntoMulti(loop840id));
     let blocks840 = Box::new(Loop(LoopBlock {
         loop_id: loop840id,
         inner: Box::new(Simple(SimpleBlock {
@@ -340,7 +340,7 @@ fn test_tokenise() {
                                                 handled: vec![
                                                     HandledBlock {
                                                         labels: vec![952],
-                                                        inner: end_node(952, Some(branch_to(959, MergedBranchIntoMulti))),
+                                                        inner: end_node(952, Some(branch_to(959, LoopBreakIntoMulti(loop756id)))),
                                                     },
                                                     HandledBlock {
                                                         labels: vec![955],
@@ -360,7 +360,7 @@ fn test_tokenise() {
                 },
             ],
         }))),
-        branches: branch_to(792, MergedBranchIntoMulti),
+        branches: branch_to(792, LoopBreakIntoMulti(loop749id)),
         next: None,
     }));
 

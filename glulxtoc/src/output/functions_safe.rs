@@ -39,9 +39,6 @@ impl GlulxOutput {
 #include \"glulxtoc.h\"
 #include <math.h>
 
-#define CALL_FUNC(code) (oldsp = stackptr, oldvsb = valstackbase, res = code, stackptr = oldsp, valstackbase = oldvsb, res)
-#define CALL_FUNC_VARARGS(code, pre_pushed_args) (oldsp = stackptr, res = code, stackptr = oldsp - pre_pushed_args * 4, res)
-
 ")?;
         write!(header_file, "#include \"glk.h\"
 
@@ -348,7 +345,17 @@ impl GlulxOutput {
                 self.output_call_safe(instruction, args, false)
             },
             _ => {
-                format!("CALL_FUNC(VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS({}, {}))", addr, count)
+                let callee_addr = match instruction.operands[0] {
+                    Constant(addr) => addr,
+                    _ => panic!("Dynamic callf not supported at {:?}", instruction.addr),
+                };
+                let callee = &self.state.functions[&callee_addr];
+                if callee.argument_mode == FunctionArgumentMode::Stack {
+                    format!("(arg = {}, CALL_FUNC_VARARGS((PushStack(arg), VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS({}, arg)), arg))", count, addr)
+                }
+                else {
+                    format!("CALL_FUNC(VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS({}, {}))", addr, count)
+                }
             },
         }
     }

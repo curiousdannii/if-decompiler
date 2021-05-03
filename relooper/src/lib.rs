@@ -542,20 +542,25 @@ impl<L: RelooperLabel> Relooper<L> {
         self.counter += 1;
         let loop_node = self.graph.add_node(if multi_loop { Node::LoopMulti(loop_id) } else { Node::Loop(loop_id) });
 
-        // Replace the incoming edges
+        // Process the incoming edges
         for &node in loop_headers {
             let mut edges = self.graph.neighbors_directed(node, Incoming).detach();
             while let Some((edge_id, parent)) = edges.next(&self.graph) {
                 if loop_parent_filter(parent) {
-                    // As long as the edge isn't a Next/Removed, then add a new edge to the loop_node
                     match self.graph[edge_id] {
-                        Edge::Next | Edge::Removed => {},
-                        _ => {
+                        // Forward edges get replaced
+                        Edge::Forward => {
                             self.graph.add_edge(parent, loop_node, if multi_loop { Edge::ForwardMulti(self.get_basic_node_label(node)) } else { Edge::Forward });
+                            self.graph[edge_id] = Edge::Removed;
                         },
+                        Edge::ForwardMulti(_) => unreachable!("A loop node should never be a loop header of a second loop"),
+                        // Next edges get removed
+                        Edge::Next => {
+                            self.graph[edge_id] = Edge::Removed;
+                        },
+                        // Other edges are left as they are
+                        _ => {},
                     };
-                    // Cannot remove edges without potentially breaking other edge indexes, so mark them as removed instead
-                    self.graph[edge_id] = Edge::Removed;
                 }
             }
         }
@@ -572,8 +577,9 @@ impl<L: RelooperLabel> Relooper<L> {
                     let mut neighbors = FnvHashSet::default();
                     for edge in self.graph.edges(node) {
                         match edge.weight() {
-                            Edge::Forward | Edge::ForwardMulti(_) => { neighbors.insert(edge.target()); },
-                            _ => {},
+                            // Ignore Next and Removed edges, but include everything else
+                            Edge::Next | Edge::Removed => {},
+                            _ => { neighbors.insert(edge.target()); },
                         };
                     }
                     if neighbors.len() == 1 {

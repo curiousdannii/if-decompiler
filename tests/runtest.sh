@@ -26,11 +26,12 @@ cargo run --bin glulxtoc -- $FILE --out-dir=$OUTDIR $DISFLAG $DEBUG
 
 CHEAPGLK="$OUTDIR/cheapglk"
 mkdir -p $CHEAPGLK
+export CC=clang
 cmake -B$CHEAPGLK -S$OUTDIR
 make -C $CHEAPGLK -j$(nproc) --no-print-directory
 
 REGTEST="$(dirname "$0")/regtest.py"
 BIN="$CHEAPGLK/$(basename ${FILE%%.*}) -u"
 TESTFILE="$FILE.regtest"
-echo "Runing testfile $TESTFILE"
-python $REGTEST -i "$BIN" $TESTFILE
+echo "Running testfile $TESTFILE"
+python $REGTEST -i "$BIN" $TESTFILE -t 10

@@ -14,15 +14,5 @@ jobs:
           toolchain: stable
       - run: ./tests/download.sh
       - run: cargo test --package relooper
-
-  test-disassembler:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - run: ./tests/download.sh
+      - run: cargo build
       - run: ./tests/runtest.sh -f tests/glulxercise.ulx -d

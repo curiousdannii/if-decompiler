@@ -35,3 +35,6 @@ add_sources(NAME "OUTDIR/"
     SRCS functions_safe.c functions_unsafe.c image.c runtime.c unixstrt.c)
 target_compile_options(NAME PRIVATE -Wall -Wmissing-prototypes
     -Wstrict-prototypes -Wno-overflow -Wno-unused)
+if (CMAKE_C_COMPILER_ID MATCHES "Clang")
+    target_compile_options(NAME PRIVATE -Wno-constant-conversion -Wno-integer-overflow)
+endif()

@@ -61,7 +61,7 @@ impl GlulxOutput {
             let name_comment = self.state.debug_function_data.as_ref().map_or(String::new(), |functions| format!("// VM Function {} ({})\n", addr, functions.get(addr).unwrap().name));
 
             writeln!(code_file, "{}{} {{
-    glui32 arg, label, oldsp, oldvsb, res, temp0, temp1, temp2, temp3, temp4, temp5;", name_comment, function_spec)?;
+    glui32 arg, label = 0, oldsp, oldvsb, res, temp0, temp1, temp2, temp3, temp4, temp5;", name_comment, function_spec)?;
             if function.argument_mode == FunctionArgumentMode::Stack {
                 writeln!(code_file, "    glui32 {};", function_arguments(function.locals, false, ","))?;
             } else {
@@ -490,7 +490,7 @@ impl GlulxOutput {
 fn find_multiple(handled: &mut Vec<HandledBlock<u32>>, label: u32) -> Option<&mut ShapedBlock<u32>> {
     for block in handled.iter_mut() {
         if block.labels.contains(&label) {
-            return Some(&mut *block.inner)
+            return Some(&mut block.inner)
         }
     }
     None

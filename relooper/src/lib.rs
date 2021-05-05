@@ -88,7 +88,7 @@ pub struct MultipleBlock<L: RelooperLabel> {
 #[derive(Debug, PartialEq)]
 pub struct HandledBlock<L: RelooperLabel> {
     pub labels: Vec<L>,
-    pub inner: Box<ShapedBlock<L>>,
+    pub inner: ShapedBlock<L>,
 }
 
 /* =======================
@@ -637,7 +637,7 @@ impl<L: RelooperLabel> Relooper<L> {
                     },
                     _ => unimplemented!(),
                 },
-                inner: self.output(vec![entry]).unwrap(),
+                inner: *self.output(vec![entry]).unwrap(),
             });
         }
         // Sort so that the tests will work

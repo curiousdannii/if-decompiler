@@ -13,7 +13,7 @@ use super::*;
 
 // Tokenise__
 #[test]
-fn test_tokenise() {
+fn tokenise() {
     let input727 = make_btree(hashmap!{
         727 => vec![749],
         749 => vec![756, 959],
@@ -75,13 +75,13 @@ fn test_tokenise() {
                 handled: vec![
                     HandledBlock {
                         labels: vec![1145],
-                        inner: Box::new(Simple(SimpleBlock {
+                        inner: Simple(SimpleBlock {
                             label: 1145,
                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                 handled: vec![
                                     HandledBlock {
                                         labels: vec![1150],
-                                        inner: Box::new(Simple(SimpleBlock {
+                                        inner: Simple(SimpleBlock {
                                             label: 1150,
                                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                                 handled: vec![
@@ -93,7 +93,7 @@ fn test_tokenise() {
                                             }))),
                                             branches: branch_to(1156, MergedBranchIntoMulti),
                                             next: None,
-                                        })),
+                                        }),
                                     },
                                 ],
                             }))),
@@ -114,7 +114,7 @@ fn test_tokenise() {
                                 })),
                                 next: None,
                             }))),
-                        })),
+                        }),
                     },
                 ],
             }))),
@@ -132,13 +132,13 @@ fn test_tokenise() {
                 handled: vec![
                     HandledBlock {
                         labels: vec![1060],
-                        inner: Box::new(Simple(SimpleBlock {
+                        inner: Simple(SimpleBlock {
                             label: 1060,
                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                 handled: vec![
                                     HandledBlock {
                                         labels: vec![1089],
-                                        inner: Box::new(Simple(SimpleBlock {
+                                        inner: Simple(SimpleBlock {
                                             label: 1089,
                                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                                 handled: vec![
@@ -150,7 +150,7 @@ fn test_tokenise() {
                                             }))),
                                             branches: branch_to(1095, MergedBranchIntoMulti),
                                             next: None,
-                                        })),
+                                        }),
                                     },
                                 ],
                             }))),
@@ -171,12 +171,12 @@ fn test_tokenise() {
                                 })),
                                 next: None,
                             }))),
-                        })),
+                        }),
                     },
                 ],
             }))),
             branches: branch_to(1139, LoopBreak(loop1054id_a)),
-            next: Some(end_node(1198, Some(branch_to(990, LoopContinue(loop990id))))),
+            next: Some(Box::new(end_node(1198, Some(branch_to(990, LoopContinue(loop990id)))))),
         })),
         next: None,
     }));
@@ -189,7 +189,7 @@ fn test_tokenise() {
                 handled: vec![
                     HandledBlock {
                         labels: vec![997],
-                        inner: Box::new(Simple(SimpleBlock {
+                        inner: Simple(SimpleBlock {
                             label: 997,
                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                 handled: vec![
@@ -206,7 +206,7 @@ fn test_tokenise() {
                                 branches: FnvHashMap::default(),
                                 next: Some(loop1139),
                             }))),
-                        }))
+                        }),
                     },
                 ],
             }))),
@@ -225,25 +225,25 @@ fn test_tokenise() {
                 handled: vec![
                     HandledBlock {
                         labels: vec![846],
-                        inner: Box::new(Simple(SimpleBlock {
+                        inner: Simple(SimpleBlock {
                             label: 846,
                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                 handled: vec![
                                     HandledBlock {
                                         labels: vec![865],
-                                        inner: Box::new(Simple(SimpleBlock {
+                                        inner: Simple(SimpleBlock {
                                             label: 865,
                                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                                 handled: vec![
                                                     HandledBlock {
                                                         labels: vec![871],
-                                                        inner: Box::new(Simple(SimpleBlock {
+                                                        inner: Simple(SimpleBlock {
                                                             label: 871,
                                                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                                                 handled: vec![
                                                                     HandledBlock {
                                                                         labels: vec![877],
-                                                                        inner: Box::new(Simple(SimpleBlock {
+                                                                        inner: Simple(SimpleBlock {
                                                                             label: 877,
                                                                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                                                                 handled: vec![
@@ -255,25 +255,25 @@ fn test_tokenise() {
                                                                             }))),
                                                                             branches: loop840branch.clone(),
                                                                             next: None,
-                                                                        })),
+                                                                        }),
                                                                     },
                                                                 ],
                                                             }))),
                                                             branches: loop840branch.clone(),
                                                             next: None,
-                                                        })),
+                                                        }),
                                                     },
                                                 ],
                                             }))),
                                             branches: loop840branch.clone(),
                                             next: None,
-                                        })),
+                                        }),
                                     },
                                 ],
                             }))),
                             branches: loop840branch.clone(),
                             next: None,
-                        })),
+                        }),
                     },
                 ],
             }))),
@@ -289,37 +289,37 @@ fn test_tokenise() {
             handled: vec![
                 HandledBlock {
                     labels: vec![796],
-                    inner: Box::new(Simple(SimpleBlock {
+                    inner: Simple(SimpleBlock {
                         label: 796,
                         immediate: Some(Box::new(Multiple(MultipleBlock {
                             handled: vec![
                                 HandledBlock {
                                     labels: vec![819],
-                                    inner: Box::new(Simple(SimpleBlock {
+                                    inner: Simple(SimpleBlock {
                                         label: 819,
                                         immediate: Some(Box::new(Multiple(MultipleBlock {
                                             handled: vec![
                                                 HandledBlock {
                                                     labels: vec![825],
-                                                    inner: Box::new(Simple(SimpleBlock {
+                                                    inner: Simple(SimpleBlock {
                                                         label: 825,
                                                         immediate: Some(Box::new(Multiple(MultipleBlock {
                                                             handled: vec![
                                                                 HandledBlock {
                                                                     labels: vec![840],
-                                                                    inner: blocks840,
+                                                                    inner: *blocks840,
                                                                 },
                                                             ],
                                                         }))),
                                                         branches: branch_to(831, MergedBranchIntoMulti),
                                                         next: None,
-                                                    })),
+                                                    }),
                                                 },
                                             ],
                                         }))),
                                         branches: branch_to(831, MergedBranchIntoMulti),
                                         next: None,
-                                    })),
+                                    }),
                                 },
                             ],
                         }))),
@@ -334,7 +334,7 @@ fn test_tokenise() {
                                     },
                                     HandledBlock {
                                         labels: vec![892],
-                                        inner: Box::new(Simple(SimpleBlock {
+                                        inner: Simple(SimpleBlock {
                                             label: 892,
                                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                                 handled: vec![
@@ -350,13 +350,13 @@ fn test_tokenise() {
                                             }))),
                                             branches: FnvHashMap::default(),
                                             next: None,
-                                        })),
+                                        }),
                                     },
                                 ],
                             })),
                             next: None,
                         }))),
-                    })),
+                    }),
                 },
             ],
         }))),
@@ -373,7 +373,7 @@ fn test_tokenise() {
                 handled: vec![
                     HandledBlock {
                         labels: vec![762],
-                        inner: Box::new(Simple(SimpleBlock {
+                        inner: Simple(SimpleBlock {
                             label: 762,
                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                 handled: vec![
@@ -385,7 +385,7 @@ fn test_tokenise() {
                             }))),
                             branches: loop756branch.clone(),
                             next: None,
-                        })),
+                        }),
                     },
                 ],
             }))),
@@ -405,7 +405,7 @@ fn test_tokenise() {
                     handled: vec![
                         HandledBlock {
                             labels: vec![756],
-                            inner: blocks756,
+                            inner: *blocks756,
                         },
                     ],
                 }))),
@@ -420,12 +420,12 @@ fn test_tokenise() {
                             },
                             HandledBlock {
                                 labels: vec![959],
-                                inner: Box::new(Simple(SimpleBlock {
+                                inner: Simple(SimpleBlock {
                                     label: 959,
                                     immediate: Some(loop990),
                                     branches: FnvHashMap::default(),
-                                    next: Some(end_node(1254, None)),
-                                })),
+                                    next: Some(Box::new(end_node(1254, None))),
+                                }),
                             },
                         ],
                     })),

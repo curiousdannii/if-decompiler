@@ -34,13 +34,13 @@ fn branch_to<T: RelooperLabel>(label: T, branch: BranchMode) -> FnvHashMap<T, Br
     res
 }
 
-fn end_node<T: RelooperLabel>(label: T, branches: Option<FnvHashMap<T, BranchMode>>) -> Box<ShapedBlock<T>> {
-    Box::new(Simple(SimpleBlock {
+fn end_node<T: RelooperLabel>(label: T, branches: Option<FnvHashMap<T, BranchMode>>) -> ShapedBlock<T> {
+    Simple(SimpleBlock {
         label,
         immediate: None,
         branches: branches.unwrap_or_default(),
         next: None,
-    }))
+    })
 }
 
 // Basic sequential blocks
@@ -56,7 +56,7 @@ fn test_basic_blocks() {
         label: 0,
         immediate: Some(Box::new(Simple(SimpleBlock {
             label: 1,
-            immediate: Some(end_node(2, None)),
+            immediate: Some(Box::new(end_node(2, None))),
             branches: FnvHashMap::default(),
             next: None,
         }))),
@@ -83,7 +83,7 @@ fn test_basic_loops() {
                 label: 1,
                 immediate: Some(Box::new(Simple(SimpleBlock {
                     label: 2,
-                    immediate: Some(end_node(3, Some(branch_to(1, LoopContinue(0))))),
+                    immediate: Some(Box::new(end_node(3, Some(branch_to(1, LoopContinue(0)))))),
                     branches: FnvHashMap::default(),
                     next: None,
                 }))),
@@ -114,12 +114,12 @@ fn test_basic_loops() {
                     handled: vec![
                         HandledBlock {
                             labels: vec![2],
-                            inner: Box::new(Simple(SimpleBlock {
+                            inner: Simple(SimpleBlock {
                                 label: 2,
-                                immediate: Some(end_node(3, Some(branch_to(1, LoopContinue(0))))),
+                                immediate: Some(Box::new(end_node(3, Some(branch_to(1, LoopContinue(0)))))),
                                 branches: FnvHashMap::default(),
                                 next: None,
-                            })),
+                            }),
                         },
                     ],
                 }))),
@@ -129,7 +129,7 @@ fn test_basic_loops() {
             next: None,
         }))),
         branches: FnvHashMap::default(),
-        next: Some(end_node(4, None)),
+        next: Some(Box::new(end_node(4, None))),
     })));
 
     let blocks = make_btree(hashmap!{
@@ -165,7 +165,7 @@ fn test_basic_loops() {
             next: None,
         }))),
         branches: FnvHashMap::default(),
-        next: Some(end_node(4, None)),
+        next: Some(Box::new(end_node(4, None))),
     })));
 
     // Test a self loop
@@ -185,7 +185,7 @@ fn test_basic_loops() {
             ]),
             next: None,
         })),
-        next: Some(end_node(1, None)),
+        next: Some(Box::new(end_node(1, None))),
     })));
 
     // Multiple breaks to a dominated node from a loop (a little excerpt from the Glulxercise Tokenise test)
@@ -207,7 +207,7 @@ fn test_basic_loops() {
                     handled: vec![
                         HandledBlock {
                             labels: vec![762],
-                            inner: Box::new(Simple(SimpleBlock {
+                            inner: Simple(SimpleBlock {
                                 label: 762,
                                 immediate: Some(Box::new(Multiple(MultipleBlock {
                                     handled: vec![
@@ -219,7 +219,7 @@ fn test_basic_loops() {
                                 }))),
                                 branches: branch_to(786, LoopBreak(0)),
                                 next: None,
-                            })),
+                            }),
                         },
                     ],
                 }))),
@@ -229,7 +229,7 @@ fn test_basic_loops() {
             next: None,
         }))),
         branches: FnvHashMap::default(),
-        next: Some(end_node(786, None)),
+        next: Some(Box::new(end_node(786, None))),
     })));
 }
 
@@ -282,7 +282,7 @@ fn test_basic_ifs() {
             ],
         }))),
         branches: FnvHashMap::default(),
-        next: Some(end_node(3, None)),
+        next: Some(Box::new(end_node(3, None))),
     })));
 
     let blocks = make_btree(hashmap!{
@@ -302,7 +302,7 @@ fn test_basic_ifs() {
             ],
         }))),
         branches: branch_to(2, MergedBranch),
-        next: Some(end_node(2, None)),
+        next: Some(Box::new(end_node(2, None))),
     })));
 }
 
@@ -323,7 +323,7 @@ fn test_nested_loops() {
                 handled: vec![
                     HandledBlock {
                         labels: vec![1],
-                        inner: Box::new(Loop(LoopBlock {
+                        inner: Loop(LoopBlock {
                             loop_id: 1,
                             inner: Box::new(Simple(SimpleBlock {
                                 label: 1,
@@ -340,14 +340,14 @@ fn test_nested_loops() {
                                 next: None,
                             })),
                             next: None,
-                        })),
+                        }),
                     },
                 ],
             }))),
             branches: branch_to(3, LoopBreak(0)),
             next: None,
         })),
-        next: Some(end_node(3, None)),
+        next: Some(Box::new(end_node(3, None))),
     })));
 }
 
@@ -374,7 +374,7 @@ mod nested_branches {
                 handled: vec![
                     HandledBlock {
                         labels: vec![1],
-                        inner: Box::new(Simple(SimpleBlock {
+                        inner: Simple(SimpleBlock {
                             label: 1,
                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                 handled: vec![
@@ -388,13 +388,13 @@ mod nested_branches {
                                     },
                                 ],
                             }))),
-                            next: Some(end_node(4, Some(branch_to(8, MergedBranch)))),
+                            next: Some(Box::new(end_node(4, Some(branch_to(8, MergedBranch))))),
                             branches: FnvHashMap::default(),
-                        })),
+                        }),
                     },
                     HandledBlock {
                         labels: vec![5],
-                        inner: Box::new(Simple(SimpleBlock {
+                        inner: Simple(SimpleBlock {
                             label: 5,
                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                 handled: vec![
@@ -410,12 +410,12 @@ mod nested_branches {
                             }))),
                             branches: FnvHashMap::default(),
                             next: None,
-                        })),
+                        }),
                     }
                 ],
             }))),
             branches: FnvHashMap::default(),
-            next: Some(end_node(8, None)),
+            next: Some(Box::new(end_node(8, None))),
         })));
     }
 
@@ -438,7 +438,7 @@ mod nested_branches {
                 handled: vec![
                     HandledBlock {
                         labels: vec![1089],
-                        inner: Box::new(Simple(SimpleBlock {
+                        inner: Simple(SimpleBlock {
                             label: 1089,
                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                 handled: vec![
@@ -450,7 +450,7 @@ mod nested_branches {
                             }))),
                             branches: branch_to(1095, MergedBranchIntoMulti),
                             next: None,
-                        })),
+                        }),
                     },
                 ],
             }))),
@@ -495,7 +495,7 @@ fn test_loop_in_branch() {
                 },
                 HandledBlock {
                     labels: vec![2],
-                    inner: Box::new(Loop(LoopBlock {
+                    inner: Loop(LoopBlock {
                         loop_id: 0,
                         inner: Box::new(Simple(SimpleBlock {
                             label: 2,
@@ -512,12 +512,12 @@ fn test_loop_in_branch() {
                             next: None,
                         })),
                         next: None,
-                    })),
+                    }),
                 },
             ],
         }))),
         branches: FnvHashMap::default(),
-        next: Some(end_node(4, None)),
+        next: Some(Box::new(end_node(4, None))),
     })));
 }
 
@@ -541,7 +541,7 @@ fn test_spaghetti() {
             handled: vec![
                 HandledBlock {
                     labels: vec![1],
-                    inner: Box::new(Simple(SimpleBlock {
+                    inner: Simple(SimpleBlock {
                         label: 1,
                         immediate: Some(Box::new(Multiple(MultipleBlock {
                             handled: vec![
@@ -557,11 +557,11 @@ fn test_spaghetti() {
                         }))),
                         branches: FnvHashMap::default(),
                         next: None,
-                    })),
+                    }),
                 },
                 HandledBlock {
                     labels: vec![2],
-                    inner: Box::new(Simple(SimpleBlock {
+                    inner: Simple(SimpleBlock {
                         label: 2,
                         immediate: Some(Box::new(Multiple(MultipleBlock {
                             handled: vec![
@@ -577,7 +577,7 @@ fn test_spaghetti() {
                         }))),
                         branches: FnvHashMap::default(),
                         next: None,
-                    })),
+                    }),
                 },
             ],
         }))),
@@ -617,7 +617,7 @@ fn test_spaghetti() {
                 },
                 HandledBlock {
                     labels: vec![2],
-                    inner: Box::new(Loop(LoopBlock {
+                    inner: Loop(LoopBlock {
                         loop_id: 0,
                         inner: Box::new(Simple(SimpleBlock {
                             label: 2,
@@ -625,7 +625,7 @@ fn test_spaghetti() {
                                 handled: vec![
                                     HandledBlock {
                                         labels: vec![4],
-                                        inner: Box::new(Simple(SimpleBlock {
+                                        inner: Simple(SimpleBlock {
                                             label: 4,
                                             immediate: None,
                                             branches: FnvHashMap::from_iter(vec![
@@ -633,11 +633,11 @@ fn test_spaghetti() {
                                                 (6, LoopBreakIntoMulti(0)),
                                             ]),
                                             next: None,
-                                        })),
+                                        }),
                                     },
                                     HandledBlock {
                                         labels: vec![5],
-                                        inner: Box::new(Simple(SimpleBlock {
+                                        inner: Simple(SimpleBlock {
                                             label: 5,
                                             immediate: None,
                                             branches: FnvHashMap::from_iter(vec![
@@ -645,7 +645,7 @@ fn test_spaghetti() {
                                                 (7, LoopBreakIntoMulti(0)),
                                             ]),
                                             next: None,
-                                        })),
+                                        }),
                                     },
                                 ],
                             }))),
@@ -653,7 +653,7 @@ fn test_spaghetti() {
                             next: None,
                         })),
                         next: None,
-                    })),
+                    }),
                 },
                 HandledBlock {
                     labels: vec![3],
@@ -699,13 +699,13 @@ fn test_stackifier_multiloop() {
                 handled: vec![
                     HandledBlock {
                         labels: vec!['B'],
-                        inner: Box::new(Simple(SimpleBlock {
+                        inner: Simple(SimpleBlock {
                             label: 'B',
                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                 handled: vec![
                                     HandledBlock {
                                         labels: vec!['D'],
-                                        inner: Box::new(Simple(SimpleBlock {
+                                        inner: Simple(SimpleBlock {
                                             label: 'D',
                                             immediate: None,
                                             branches: FnvHashMap::from_iter(vec![
@@ -713,13 +713,13 @@ fn test_stackifier_multiloop() {
                                                 ('C', LoopContinueIntoMulti(0)),
                                             ]),
                                             next: None,
-                                        })),
+                                        }),
                                     },
                                 ],
                             }))),
                             branches: branch_to('E', MergedBranch),
                             next: None,
-                        })),
+                        }),
                     },
                     HandledBlock {
                         labels: vec!['C'],
@@ -750,7 +750,7 @@ fn test_stackifier_multiloop() {
             }))),
         }))),
         branches: FnvHashMap::default(),
-        next: Some(end_node('H', None)),
+        next: Some(Box::new(end_node('H', None))),
     })));
 }
 
@@ -775,7 +775,7 @@ fn test_loopmulti() {
                 },
                 HandledBlock {
                     labels: vec![3, 4],
-                    inner: Box::new(Loop(LoopBlock {
+                    inner: Loop(LoopBlock {
                         loop_id: 0,
                         inner: Box::new(Multiple(MultipleBlock {
                             handled: vec![
@@ -785,17 +785,17 @@ fn test_loopmulti() {
                                 },
                                 HandledBlock {
                                     labels: vec![4],
-                                    inner: Box::new(Simple(SimpleBlock {
+                                    inner: Simple(SimpleBlock {
                                         label: 4,
-                                        immediate: Some(end_node(5, Some(branch_to(3, LoopContinueIntoMulti(0))))),
+                                        immediate: Some(Box::new(end_node(5, Some(branch_to(3, LoopContinueIntoMulti(0)))))),
                                         branches: FnvHashMap::default(),
                                         next: None,
-                                    })),
+                                    }),
                                 },
                             ],
                         })),
                         next: None,
-                    })),
+                    }),
                 },
             ],
         }))),
@@ -820,13 +820,13 @@ fn test_loopmulti() {
             handled: vec![
                 HandledBlock {
                     labels: vec![1],
-                    inner: Box::new(Simple(SimpleBlock {
+                    inner: Simple(SimpleBlock {
                         label: 1,
                         immediate: Some(Box::new(Multiple(MultipleBlock {
                             handled: vec![
                                 HandledBlock {
                                     labels: vec![2],
-                                    inner: Box::new(Simple(SimpleBlock {
+                                    inner: Simple(SimpleBlock {
                                         label: 2,
                                         immediate: None,
                                         branches: FnvHashMap::from_iter(vec![
@@ -834,7 +834,7 @@ fn test_loopmulti() {
                                             (4, MergedBranchIntoMulti),
                                         ]),
                                         next: None,
-                                    })),
+                                    }),
                                 },
                             ],
                         }))),
@@ -845,7 +845,7 @@ fn test_loopmulti() {
                                 handled: vec![
                                     HandledBlock {
                                         labels: vec![3],
-                                        inner: Box::new(Simple(SimpleBlock {
+                                        inner: Simple(SimpleBlock {
                                             label: 3,
                                             immediate: None,
                                             branches: FnvHashMap::from_iter(vec![
@@ -853,7 +853,7 @@ fn test_loopmulti() {
                                                 (5, MergedBranch),
                                             ]),
                                             next: None,
-                                        })),
+                                        }),
                                     },
                                     HandledBlock {
                                         labels: vec![4],
@@ -871,11 +871,11 @@ fn test_loopmulti() {
                                 next: None,
                             }))),
                         }))),
-                    })),
+                    }),
                 },
             ],
         }))),
         branches: branch_to(6, MergedBranch),
-        next: Some(end_node(6, None)),
+        next: Some(Box::new(end_node(6, None))),
     })));
 }

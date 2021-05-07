@@ -89,7 +89,7 @@ pub struct MultipleBlock<L: RelooperLabel> {
 pub struct HandledBlock<L: RelooperLabel> {
     pub labels: Vec<L>,
     pub inner: ShapedBlock<L>,
-    break_after: bool,
+    pub break_after: bool,
 }
 
 /* =======================
@@ -337,6 +337,7 @@ impl<L: RelooperLabel> Relooper<L> {
                 }
                 let branch = nodes_to_process.get_mut(&dominator_id).unwrap();
                 branch.dominated_nodes.push(node);
+                branch.dominated_nodes.sort();
                 for parent in parent_nodes {
                     branch.parent_nodes.insert(parent);
                 }
@@ -372,8 +373,8 @@ impl<L: RelooperLabel> Relooper<L> {
                 }
             }
 
-            // Simple case - only one merged branch, or branches that can't reach each other
-            if !into_multi || !self.can_nodes_reach_each_other(&dominated_nodes) {
+            // Simple case - only one merged branch, branches that can't reach each other, or branches that only reach the next branch in order
+            if !into_multi || self.can_merged_nodes_use_multiple(&dominated_nodes) {
                 for &node in dominated_nodes {
                     // Add the next node
                     self.graph.add_edge(dominator, node, Edge::Next);
@@ -390,12 +391,14 @@ impl<L: RelooperLabel> Relooper<L> {
                 continue;
             }
 
+            panic!("Merging branches which reach each other in a complex manner are not yet supported (dominator: {:?})", self.graph[dominator]);
+
             // Multiple nodes get turned into a LoopMulti
-            let loop_headers = dominated_nodes.iter().map(|&i| i).collect();
+            /*let loop_headers = dominated_nodes.iter().map(|&i| i).collect();
             let loop_parents: Vec<NodeIndex> = merged_branch.parent_nodes.difference(&FnvHashSet::from_iter(dominated_nodes.iter().map(|&i| i))).map(|&i| i).collect();
 
             let loop_parents_test = |i| loop_parents.contains(&i);
-            self.make_loop(&loop_headers, &loop_parents, &loop_headers, loop_parents_test);
+            self.make_loop(&loop_headers, &loop_parents, &loop_headers, loop_parents_test);*/
         }
     }
 
@@ -490,21 +493,22 @@ impl<L: RelooperLabel> Relooper<L> {
     }
 
     // Can any of these nodes reach any other?
-    fn can_nodes_reach_each_other(&self, nodes: &Vec<NodeIndex>) -> bool {
+    fn can_merged_nodes_use_multiple(&self, nodes: &Vec<NodeIndex>) -> bool {
         // Filter the graph to ignore processed back edges
         let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges);
         let mut space = algo::DfsSpace::new(&filtered_graph);
-        for &x in nodes {
-            for &y in nodes {
-                if x == y {
+        for (x_index, &x) in nodes.iter().enumerate() {
+            for (y_index, &y) in nodes.iter().enumerate() {
+                // Skip nodes that are the same, or when y is immediately after x.
+                if x_index == y_index || y_index == x_index + 1 {
                     continue;
                 }
                 if algo::has_path_connecting(&filtered_graph, x, y, Some(&mut space)) {
-                    return true;
+                    return false;
                 }
             }
         }
-        return false;
+        return true;
     }
 
     fn get_basic_node_label(&self, id: NodeIndex) -> L {
@@ -619,9 +623,26 @@ impl<L: RelooperLabel> Relooper<L> {
         (loop_node, loop_id)
     }
 
-    fn output_multiple_handled(&self, entries: Vec<NodeIndex>) -> Vec<HandledBlock<L>> {
+    fn output_multiple_handled(&self, mut entries: Vec<NodeIndex>) -> Vec<HandledBlock<L>> {
+        // In this function only, follow MergedBranch edges
+        fn filter_removed_edges<L>(edge: petgraph::graph::EdgeReference<Edge<L>>) -> bool {
+            use Edge::*;
+            match edge.weight() {
+                Forward | ForwardMulti(_) | Next | ForwardMultiViaNext(_)
+                    | LoopBreak(_) | LoopBreakIntoMulti(_) | MergedBranch
+                    | MergedBranchIntoMulti => true,
+                _ => false,
+            }
+        }
+
+        let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_removed_edges);
+        let mut space = algo::DfsSpace::new(&filtered_graph);
         let mut handled = Vec::default();
-        for entry in entries {
+        let entries_count = entries.len();
+        entries.sort();
+        for index in 0..entries_count {
+            let entry = entries[index];
+            let next_entry = entries.get(index + 1);
             handled.push(HandledBlock {
                 labels: match self.graph[entry] {
                     Node::Basic(label) | Node::Multiple(label) => vec![label],
@@ -639,7 +660,8 @@ impl<L: RelooperLabel> Relooper<L> {
                     _ => unimplemented!(),
                 },
                 inner: *self.output(vec![entry]).unwrap(),
-                break_after: true,
+                // false if this entry can reach the next, otherwise true
+                break_after: next_entry.map_or(true, |next| !algo::has_path_connecting(&filtered_graph, entry, *next, Some(&mut space))),
             });
         }
         // Sort so that the tests will work

@@ -66,24 +66,20 @@ fn looksub() {
                                 ],
                             }))),
                             branches: branch_to(3737, MergedBranchIntoMulti),
-                            next: Some(Box::new(Loop(LoopBlock {
-                                loop_id: 1,
-                                inner: Box::new(Multiple(MultipleBlock {
-                                    handled: vec![
-                                        basic_handled(3737, end_node(3737, Some(branch_to(3761, LoopContinueIntoMulti(1))))),
-                                        basic_handled(3761, Simple(SimpleBlock {
-                                            label: 3761,
-                                            immediate: Some(Box::new(Multiple(MultipleBlock {
-                                                handled: vec![
-                                                    basic_handled(3765, end_node(3765, Some(branch_to(3771, MergedBranch)))),
-                                                ],
-                                            }))),
-                                            branches: branch_to(3771, MergedBranch),
-                                            next: Some(Box::new(end_node(3771, Some(branch_to(3798, MergedBranch))))),
-                                        })),
-                                    ],
-                                })),
-                                next: None,
+                            next: Some(Box::new(Multiple(MultipleBlock {
+                                handled: vec![
+                                    basic_handled_without_break(3737, end_node(3737, Some(branch_to(3761, MergedBranchIntoMulti)))),
+                                    basic_handled(3761, Simple(SimpleBlock {
+                                        label: 3761,
+                                        immediate: Some(Box::new(Multiple(MultipleBlock {
+                                            handled: vec![
+                                                basic_handled(3765, end_node(3765, Some(branch_to(3771, MergedBranch)))),
+                                            ],
+                                        }))),
+                                        branches: branch_to(3771, MergedBranch),
+                                        next: Some(Box::new(end_node(3771, Some(branch_to(3798, MergedBranch))))),
+                                    })),
+                                ],
                             }))),
                         })),
                     ],
@@ -162,14 +158,10 @@ fn tokenise() {
 
     let loop749id = 1;
     let loop756id = 5;
-    let loop792id = 6;
-    let loop831id = 7;
     let loop840id = 4;
     let loop990id = 0;
     let loop1054id = 3;
-    let loop1095id = 9;
     let loop1139id = 2;
-    let loop1156id = 8;
 
     let loop1139 = Box::new(Loop(LoopBlock {
         loop_id: loop1139id,
@@ -194,15 +186,11 @@ fn tokenise() {
                             ],
                         }))),
                         branches: branch_to(1156, MergedBranchIntoMulti),
-                        next: Some(Box::new(Loop(LoopBlock {
-                            loop_id: loop1156id,
-                            inner: Box::new(Multiple(MultipleBlock {
-                                handled: vec![
-                                    basic_handled(1156, end_node(1156, Some(branch_to(1189, LoopContinueIntoMulti(loop1156id))))),
-                                    basic_handled(1189, end_node(1189, Some(branch_to(1139, LoopContinue(loop1139id))))),
-                                ],
-                            })),
-                            next: None,
+                        next: Some(Box::new(Multiple(MultipleBlock {
+                            handled: vec![
+                                basic_handled_without_break(1156, end_node(1156, Some(branch_to(1189, MergedBranchIntoMulti)))),
+                                basic_handled(1189, end_node(1189, Some(branch_to(1139, LoopContinue(loop1139id))))),
+                            ],
                         }))),
                     })),
                 ],
@@ -236,15 +224,11 @@ fn tokenise() {
                             ],
                         }))),
                         branches: branch_to(1095, MergedBranchIntoMulti),
-                        next: Some(Box::new(Loop(LoopBlock {
-                            loop_id: loop1095id,
-                            inner: Box::new(Multiple(MultipleBlock {
-                                handled: vec![
-                                    basic_handled(1095, end_node(1095, Some(branch_to(1130, LoopContinueIntoMulti(loop1095id))))),
-                                    basic_handled(1130, end_node(1130, Some(branch_to(1054, LoopContinue(loop1054id))))),
-                                ],
-                            })),
-                            next: None,
+                        next: Some(Box::new(Multiple(MultipleBlock {
+                            handled: vec![
+                                basic_handled_without_break(1095, end_node(1095, Some(branch_to(1130, MergedBranchIntoMulti)))),
+                                basic_handled(1130, end_node(1130, Some(branch_to(1054, LoopContinue(loop1054id))))),
+                            ],
                         }))),
                     })),
                 ],
@@ -366,25 +350,21 @@ fn tokenise() {
                         ],
                     }))),
                     branches: branch_to(831, MergedBranchIntoMulti),
-                    next: Some(Box::new(Loop(LoopBlock {
-                        loop_id: loop831id,
-                        inner: Box::new(Multiple(MultipleBlock {
-                            handled: vec![
-                                basic_handled(831, end_node(831, Some(branch_to(892, LoopContinueIntoMulti(loop831id))))),
-                                basic_handled(892, Simple(SimpleBlock {
-                                    label: 892,
-                                    immediate: Some(Box::new(Multiple(MultipleBlock {
-                                        handled: vec![
-                                            basic_handled(952, end_node(952, Some(branch_to(959, LoopBreakIntoMulti(loop756id))))),
-                                            basic_handled(955, end_node(955, Some(branch_to(749, LoopContinue(loop749id))))),
-                                        ],
-                                    }))),
-                                    branches: FnvHashMap::default(),
-                                    next: None,
-                                })),
-                            ],
-                        })),
-                        next: None,
+                    next: Some(Box::new(Multiple(MultipleBlock {
+                        handled: vec![
+                            basic_handled_without_break(831, end_node(831, Some(branch_to(892, MergedBranchIntoMulti)))),
+                            basic_handled(892, Simple(SimpleBlock {
+                                label: 892,
+                                immediate: Some(Box::new(Multiple(MultipleBlock {
+                                    handled: vec![
+                                        basic_handled(952, end_node(952, Some(branch_to(959, LoopBreakIntoMulti(loop756id))))),
+                                        basic_handled(955, end_node(955, Some(branch_to(749, LoopContinue(loop749id))))),
+                                    ],
+                                }))),
+                                branches: FnvHashMap::default(),
+                                next: None,
+                            })),
+                        ],
                     }))),
                 })),
             ],
@@ -430,26 +410,22 @@ fn tokenise() {
                     ],
                 }))),
                 branches: branch_to(959, MergedBranchIntoMulti),
-                next: Some(Box::new(Loop(LoopBlock {
-                    loop_id: loop792id,
-                    inner: Box::new(Multiple(MultipleBlock {
-                        handled: vec![
-                            basic_handled(792, end_node(792, Some(branch_to(959, LoopContinueIntoMulti(loop792id))))),
-                            basic_handled(959, Simple(SimpleBlock {
-                                label: 959,
-                                immediate: Some(loop990),
-                                branches: FnvHashMap::default(),
-                                next: Some(Box::new(end_node(1254, None))),
-                            })),
-                        ],
-                    })),
-                    next: None,
-                }))),
+                next: None,
             })),
             next: None,
         }))),
         branches: FnvHashMap::default(),
-        next: None,
+        next: Some(Box::new(Multiple(MultipleBlock {
+            handled: vec![
+                basic_handled_without_break(792, end_node(792, Some(branch_to(959, MergedBranchIntoMulti)))),
+                basic_handled(959, Simple(SimpleBlock {
+                    label: 959,
+                    immediate: Some(loop990),
+                    branches: FnvHashMap::default(),
+                    next: Some(Box::new(end_node(1254, None))),
+                })),
+            ],
+        }))),
     }));
 
     let result727 = reloop(input727, 727);

@@ -188,7 +188,9 @@ impl GlulxOutput {
                         output.push_str(&format!("{}    case {}:\n", indent, label));
                     }
                     output.push_str(&self.output_shaped_block(function, &mut handled.inner, indents + 2));
-                    output.push_str(&format!("{}        break;\n", indent));
+                    if handled.break_after {
+                        output.push_str(&format!("{}        break;\n", indent));
+                    }
                 }
                 output.push_str(&format!("{}}}\n", indent));
             },

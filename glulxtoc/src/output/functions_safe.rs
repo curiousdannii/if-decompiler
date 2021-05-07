@@ -370,77 +370,67 @@ impl GlulxOutput {
                 match target {
                     Dynamic => panic!("Dynamic branch in safe function at {:?}", instruction.addr),
                     Absolute(addr) => {
-                        // A simple if branch
-                        if let Some(MergedBranch) = simple_block.branches.get(&addr) {
+                        // Handle OP_JUMP: it should have its action in the branches map, or jump into a SimpleBlock immediate
+                        if instruction.opcode == OP_JUMP {
+                            if let Some(branch_mode) = simple_block.branches.get(&addr) {
+                                return format!("{};", output_branchmode(branch_mode, addr));
+                            }
                             if let Some(immediate_block) = simple_block.immediate.as_deref_mut() {
-                                if let Multiple(ref mut multiple_block) = immediate_block {
-                                    if multiple_block.handled.len() == 1 {
-                                        let branch_a_block_opt = find_multiple(&mut multiple_block.handled, instruction.next);
-                                        if let Some(mut branch_a_block) = branch_a_block_opt {
-                                            let output = format!("if (!({})) {{\n{}{}}}", condition, self.output_shaped_block(function, &mut branch_a_block, indents + 1), indent);
-                                            simple_block.immediate = None;
-                                            return output;
-                                        }
-                                    }
+                                if let Simple(_) = immediate_block {
+                                    let output = format!("/* Jumping into immediate */\n{}", self.output_shaped_block(function, immediate_block, indents));
+                                    simple_block.immediate = None;
+                                    return output;
                                 }
                             }
                         }
 
-                        // Look in the block's branches to see if we break, continue, etc
-                        if let Some(branch_mode) = simple_block.branches.get(&addr) {
-                            return match instruction.opcode {
-                                OP_JUMP => format!("{};", output_branchmode(branch_mode, addr)),
-                                OP_JUMPABS => unimplemented!("OP_JUMPABS branch not yet supported"),
-                                _ => {
-                                    let mut output = format!("if ({}) {{{};}}", condition, output_branchmode(branch_mode, addr));
-                                    // See if we can extract the next block out of an immediate Multiple
-                                    if let Some(immediate_block) = simple_block.immediate.as_deref_mut() {
-                                        if let Multiple(ref mut multiple_block) = immediate_block {
-                                            if multiple_block.handled.len() == 1 {
-                                                let branch_a_block_opt = find_multiple(&mut multiple_block.handled, instruction.next);
-                                                if let Some(mut branch_a_block) = branch_a_block_opt {
-                                                    output.push('\n');
-                                                    output.push_str(&self.output_shaped_block(function, &mut branch_a_block, indents));
-                                                    simple_block.immediate = None;
-                                                }
-                                            }
-                                        }
-                                    }
-                                    output
-                                },
-                            };
+                        if let Some(Multiple(ref mut multiple_block)) = simple_block.immediate.as_deref_mut() {
+                            // Check if the next instruction is in the immediate block
+                            if let Some(next_block_index) = find_multiple(&multiple_block.handled, instruction.next) {
+                                // if-else with both blocks in handled
+                                if let Some(if_block_index) = find_multiple(&multiple_block.handled, addr) {
+                                    assert!(multiple_block.handled.len() == 2, "Unhandled multiple block");
+                                    let output = format!("if ({}) {{\n{}{}}}\n{}else {{\n{}{}}}", condition, self.output_multiple(function, &mut multiple_block.handled, if_block_index, indents + 1), indent, indent, self.output_multiple(function, &mut multiple_block.handled, next_block_index, indents + 1), indent);
+                                    simple_block.immediate = None;
+                                    return output;
+                                }
+
+                                // A simple if branch, where the branch target is a MergedBranch
+                                if let Some(MergedBranch) = simple_block.branches.get(&addr) {
+                                    assert!(multiple_block.handled.len() == 1, "Unhandled multiple block");
+                                    let output = format!("if (!({})) {{\n{}{}}}", condition, self.output_multiple(function, &mut multiple_block.handled, next_block_index, indents + 1), indent);
+                                    simple_block.immediate = None;
+                                    return output;
+                                }
+
+                                // Some other kind of branch action
+                                if let Some(branch_mode) = simple_block.branches.get(&addr) {
+                                    assert!(multiple_block.handled.len() == 1, "Unhandled multiple block");
+                                    let output = format!("if ({}) {{\n{}    {};\n{}}}\n{}else {{\n{}{}}}", condition, indent, output_branchmode(branch_mode, addr), indent, indent, self.output_multiple(function, &mut multiple_block.handled, next_block_index, indents + 1), indent);
+                                    simple_block.immediate = None;
+                                    return output;
+                                }
+                            }
+
+                            // Otherwise the branch target could be in immediate, and the next in the branches map
+                            if let Some(target_block_index) = find_multiple(&multiple_block.handled, addr) {
+                                if let Some(branch_mode) = simple_block.branches.get(&instruction.next) {
+                                    assert!(multiple_block.handled.len() == 1, "Unhandled multiple block");
+                                    let output = format!("if ({}) {{\n{}{}}}\n{}else {{\n{}    {};\n{}}}", condition, self.output_multiple(function, &mut multiple_block.handled, target_block_index, indents + 1), indent, indent, indent, output_branchmode(branch_mode, instruction.next), indent);
+                                    simple_block.immediate = None;
+                                    return output;
+                                }
+                            }
                         }
 
-                        // Inspect the next block
-                        match simple_block.immediate.as_deref_mut() {
-                            Some(mut immediate_block) => {
-                                match immediate_block {
-                                    Simple(_) => {
-                                        match instruction.opcode {
-                                            OP_JUMP => {
-                                                let output = format!("/* Jumping into immediate */\n{}", self.output_shaped_block(function, &mut immediate_block, indents));
-                                                simple_block.immediate = None;
-                                                output
-                                            },
-                                            OP_JUMPABS => unimplemented!("OP_JUMPABS branch not yet supported"),
-                                            _ => panic!("Should not branch directly into a SimpleBlock"),
-                                        }
-                                    },
-                                    Loop(_) => panic!("Should not branch directly into a LoopBlock"),
-                                    Multiple(block) => {
-                                        let mut if_block = find_multiple(&mut block.handled, addr).unwrap();
-                                        let mut output = format!("if ({}) {{\n{}{}}}", condition, self.output_shaped_block(function, &mut if_block, indents + 1), indent);
-                                        let else_block_option = find_multiple(&mut block.handled, instruction.next);
-                                        if let Some(mut else_block) = else_block_option {
-                                            output.push_str(&format!("\n{}else {{\n{}{}}}", indent, self.output_shaped_block(function, &mut else_block, indents + 1), indent));
-                                        }
-                                        simple_block.immediate = None;
-                                        output
-                                    },
-                                }
-                            },
-                            None => panic!("Branch with neither BranchMode nor immediate"),
+                        // Both target and next are in the branches map
+                        if let Some(target_branch_mode) = simple_block.branches.get(&addr) {
+                            if let Some(next_branch_mode) = simple_block.branches.get(&instruction.next) {
+                                return format!("if ({}) {{\n{}    {};\n{}}}\n{}else {{\n{}    {};\n{}}}", condition, indent, output_branchmode(target_branch_mode, addr), indent, indent, indent, output_branchmode(next_branch_mode, instruction.next), indent);
+                            }
                         }
+
+                        panic!("Unsupported branch at address {}, branching to {:?}, next {}\nBlock: {:?}", instruction.addr, target, instruction.next, simple_block);
                     },
                     Return(val) => match instruction.opcode {
                         OP_JUMP => format!("return {};", val),
@@ -450,6 +440,11 @@ impl GlulxOutput {
                 }
             },
         }
+    }
+
+    fn output_multiple(&self, function: &Function, handled: &mut Vec<HandledBlock<u32>>, index: usize, indents: usize) -> String {
+        let ref mut block = handled.get_mut(index).unwrap().inner;
+        self.output_shaped_block(function, block, indents)
     }
 
     fn output_copys_safe(&self, instruction: &Instruction) -> String {
@@ -487,10 +482,10 @@ impl GlulxOutput {
     }
 }
 
-fn find_multiple(handled: &mut Vec<HandledBlock<u32>>, label: u32) -> Option<&mut ShapedBlock<u32>> {
-    for block in handled.iter_mut() {
+fn find_multiple(handled: &Vec<HandledBlock<u32>>, label: u32) -> Option<usize> {
+    for (index, block) in handled.iter().enumerate() {
         if block.labels.contains(&label) {
-            return Some(&mut block.inner)
+            return Some(index)
         }
     }
     None

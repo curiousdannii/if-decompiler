@@ -11,6 +11,134 @@ https://github.com/curiousdannii/if-decompiler
 
 use super::*;
 
+// LookSub
+#[test]
+fn looksub() {
+    let input3686 = make_btree(hashmap!{
+        3686 => vec![3708],
+        3708 => vec![3724, 3798],
+        3724 => vec![3728, 3737],
+        3728 => vec![3737, 3750],
+        3737 => vec![3761],
+        3750 => vec![3758, 3761],
+        3758 => vec![3798],
+        3761 => vec![3765, 3771],
+        3765 => vec![3771],
+        3771 => vec![3798],
+        3798 => vec![3708, 3808],
+        3808 => vec![3818, 3833],
+        3818 => vec![3833],
+        3833 => vec![],
+    });
+
+    let result = reloop(input3686, 3686);
+    assert_eq!(result, Box::new(Simple(SimpleBlock {
+        label: 3686,
+        immediate: Some(Box::new(Loop(LoopBlock {
+            loop_id: 0,
+            inner: Box::new(Simple(SimpleBlock {
+                label: 3708,
+                immediate: Some(Box::new(Multiple(MultipleBlock {
+                    handled: vec![
+                        HandledBlock {
+                            labels: vec![3724],
+                            inner: Simple(SimpleBlock {
+                                label: 3724,
+                                immediate: Some(Box::new(Multiple(MultipleBlock {
+                                    handled: vec![
+                                        HandledBlock {
+                                            labels: vec![3728],
+                                            inner: Simple(SimpleBlock {
+                                                label: 3728,
+                                                immediate: Some(Box::new(Multiple(MultipleBlock {
+                                                    handled: vec![
+                                                        HandledBlock {
+                                                            labels: vec![3750],
+                                                            inner: Simple(SimpleBlock {
+                                                                label: 3750,
+                                                                immediate: Some(Box::new(Multiple(MultipleBlock {
+                                                                    handled: vec![
+                                                                        HandledBlock {
+                                                                            labels: vec![3758],
+                                                                            inner: end_node(3758, Some(branch_to(3798, MergedBranch))),
+                                                                        },
+                                                                    ],
+                                                                }))),
+                                                                branches: branch_to(3761, MergedBranchIntoMulti),
+                                                                next: None,
+                                                            }),
+                                                        },
+                                                    ],
+                                                }))),
+                                                branches: branch_to(3737, MergedBranchIntoMulti),
+                                                next: None,
+                                            }),
+                                        },
+                                    ],
+                                }))),
+                                branches: branch_to(3737, MergedBranchIntoMulti),
+                                next: Some(Box::new(Loop(LoopBlock {
+                                    loop_id: 1,
+                                    inner: Box::new(Multiple(MultipleBlock {
+                                        handled: vec![
+                                            HandledBlock {
+                                                labels: vec![3737],
+                                                inner: end_node(3737, Some(branch_to(3761, LoopContinueIntoMulti(1)))),
+                                            },
+                                            HandledBlock {
+                                                labels: vec![3761],
+                                                inner: Simple(SimpleBlock {
+                                                    label: 3761,
+                                                    immediate: Some(Box::new(Multiple(MultipleBlock {
+                                                        handled: vec![
+                                                            HandledBlock {
+                                                                labels: vec![3765],
+                                                                inner: end_node(3765, Some(branch_to(3771, MergedBranch))),
+                                                            },
+                                                        ],
+                                                    }))),
+                                                    branches: branch_to(3771, MergedBranch),
+                                                    next: Some(Box::new(end_node(3771, Some(branch_to(3798, MergedBranch))))),
+                                                }),
+                                            },
+                                        ],
+                                    })),
+                                    next: None,
+                                }))),
+                            }),
+                        },
+                    ],
+                }))),
+                branches: branch_to(3798, MergedBranch),
+                next: Some(Box::new(Simple(SimpleBlock {
+                    label: 3798,
+                    immediate: None,
+                    branches: FnvHashMap::from_iter(vec![
+                        (3708, LoopContinue(0)),
+                        (3808, LoopBreak(0)),
+                    ]),
+                    next: None,
+                }))),
+            })),
+            next: None,
+        }))),
+        branches: FnvHashMap::default(),
+        next: Some(Box::new(Simple(SimpleBlock {
+            label: 3808,
+            immediate: Some(Box::new(Multiple(MultipleBlock {
+                handled: vec![
+                    HandledBlock {
+                        labels: vec![3818],
+                        inner: end_node(3818, Some(branch_to(3833, MergedBranch))),
+                    },
+                ],
+            }))),
+            branches: branch_to(3833, MergedBranch),
+            next: Some(Box::new(end_node(3833, None))),
+        }))),
+    })));
+}
+
 // Tokenise__
 #[test]
 fn tokenise() {

@@ -295,22 +295,20 @@ impl GlulxOutput {
 
         // Vararg functions
         if callee.argument_mode == FunctionArgumentMode::Stack {
-            let (processed_args, pre_pushed_args) = match instruction.opcode {
+            let (prelude, processed_args, pre_pushed_args) = match instruction.opcode {
                 opcodes::OP_CALLFI ..= opcodes::OP_CALLFIII => {
-                    let (prelude, new_operands) = safe_stack_pops(&args, true);
+                    let (mut prelude, new_operands) = safe_stack_pops(&args, true);
                     let pushed_args: Vec<String> = new_operands.iter().rev().map(|arg| format!("PushStack({})", arg)).collect();
-                    if prelude == "" {
-                        (format!("{}, ", pushed_args.join(", ")), 0)
+                    if prelude != "" {
+                        prelude = format!("{}, ", prelude);
                     }
-                    else {
-                        (format!("{}, {}, ", prelude, pushed_args.join(", ")), 0)
-                    }
+                    (prelude, format!("{}, ", pushed_args.join(", ")), 0)
                 },
                 _ => {
-                    (String::new(), provided_args)
+                    (String::new(), String::new(), provided_args)
                 },
             };
-            return format!("CALL_FUNC_VARARGS(({}PushStack({}), VM_FUNC_{}()), {})", processed_args, provided_args, callee_addr, pre_pushed_args);
+            return format!("({}CALL_FUNC_VARARGS(({}PushStack({}), VM_FUNC_{}()), {}))", prelude, processed_args, provided_args, callee_addr, pre_pushed_args);
         }
 
         // Account for extra args
@@ -342,7 +340,12 @@ impl GlulxOutput {
             args.push(String::from("0"));
         }
 
-        format!("CALL_FUNC(VM_FUNC_{}({}))", callee_addr, args.join(", "))
+        let (mut prelude, new_operands) = safe_stack_pops(&args, true);
+        if prelude != "" {
+            prelude = format!("{}, ", prelude);
+        }
+        format!("({}CALL_FUNC(VM_FUNC_{}({})))", prelude, callee_addr, new_operands.join(", "))
+        //format!("CALL_FUNC(VM_FUNC_{}({}))", callee_addr, args.join(", "))
     }
 
     fn output_callf_safe(&self, instruction: &Instruction, mut operands: Vec<String>) -> String {

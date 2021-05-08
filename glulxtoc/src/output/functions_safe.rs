@@ -162,9 +162,23 @@ impl GlulxOutput {
         let mut output = String::new();
         match shaped_block {
             Simple(block) => {
+                let mut last_next_instruction = 0;
                 let basicblock = function.blocks.get(&block.label).unwrap();
                 for instruction in &basicblock.code {
                     output.push_str(&format!("{}/* {:>3X}/{} */ {}\n", indent, instruction.opcode, instruction.addr, self.output_instruction_safe(&function, block, &instruction, indents)));
+                    last_next_instruction = instruction.next;
+                }
+                // We might have one last branch left over, going to the next instruction
+                if block.branches.len() == 1 {
+                    if let Some(branch_mode) = block.branches.get(&last_next_instruction) {
+                        if branch_mode != &MergedBranch {
+                            output.push_str(&format!("{}/* Branching to next */ {};\n", indent, output_branchmode(branch_mode, last_next_instruction)));
+                        }
+                        block.branches.clear();
+                    }
+                }
+                if block.branches.len() > 0 {
+                    panic!("Unhandled leftover branch in function {}", function.addr);
                 }
                 if let Some(immediate) = block.immediate.as_deref_mut() {
                     output.push_str(&self.output_shaped_block(function, immediate, indents));
@@ -375,10 +389,14 @@ impl GlulxOutput {
                         // Handle OP_JUMP: it should have its action in the branches map, or jump into a SimpleBlock immediate
                         if instruction.opcode == OP_JUMP {
                             if let Some(branch_mode) = simple_block.branches.get(&addr) {
-                                return format!("{};", output_branchmode(branch_mode, addr));
+                                assert!(simple_block.branches.len() == 1, "Unhandled branch");
+                                let output = format!("{};", output_branchmode(branch_mode, addr));
+                                simple_block.branches.clear();
+                                return output;
                             }
                             if let Some(immediate_block) = simple_block.immediate.as_deref_mut() {
                                 if let Simple(_) = immediate_block {
+                                    assert!(simple_block.branches.len() == 0, "Unhandled branch");
                                     let output = format!("/* Jumping into immediate */\n{}", self.output_shaped_block(function, immediate_block, indents));
                                     simple_block.immediate = None;
                                     return output;
@@ -392,6 +410,7 @@ impl GlulxOutput {
                                 // if-else with both blocks in handled
                                 if let Some(if_block_index) = find_multiple(&multiple_block.handled, addr) {
                                     assert!(multiple_block.handled.len() == 2, "Unhandled multiple block");
+                                    assert!(simple_block.branches.len() == 0, "Unhandled branch");
                                     let output = format!("if ({}) {{\n{}{}}}\n{}else {{\n{}{}}}", condition, self.output_multiple(function, &mut multiple_block.handled, if_block_index, indents + 1), indent, indent, self.output_multiple(function, &mut multiple_block.handled, next_block_index, indents + 1), indent);
                                     simple_block.immediate = None;
                                     return output;
@@ -400,16 +419,20 @@ impl GlulxOutput {
                                 // A simple if branch, where the branch target is a MergedBranch
                                 if let Some(MergedBranch) = simple_block.branches.get(&addr) {
                                     assert!(multiple_block.handled.len() == 1, "Unhandled multiple block");
+                                    assert!(simple_block.branches.len() == 1, "Unhandled branch");
                                     let output = format!("if (!({})) {{\n{}{}}}", condition, self.output_multiple(function, &mut multiple_block.handled, next_block_index, indents + 1), indent);
                                     simple_block.immediate = None;
+                                    simple_block.branches.clear();
                                     return output;
                                 }
 
                                 // Some other kind of branch action
                                 if let Some(branch_mode) = simple_block.branches.get(&addr) {
                                     assert!(multiple_block.handled.len() == 1, "Unhandled multiple block");
+                                    assert!(simple_block.branches.len() == 1, "Unhandled branch");
                                     let output = format!("if ({}) {{\n{}    {};\n{}}}\n{}else {{\n{}{}}}", condition, indent, output_branchmode(branch_mode, addr), indent, indent, self.output_multiple(function, &mut multiple_block.handled, next_block_index, indents + 1), indent);
                                     simple_block.immediate = None;
+                                    simple_block.branches.clear();
                                     return output;
                                 }
                             }
@@ -418,8 +441,10 @@ impl GlulxOutput {
                             if let Some(target_block_index) = find_multiple(&multiple_block.handled, addr) {
                                 if let Some(branch_mode) = simple_block.branches.get(&instruction.next) {
                                     assert!(multiple_block.handled.len() == 1, "Unhandled multiple block");
+                                    assert!(simple_block.branches.len() == 1, "Unhandled branch");
                                     let output = format!("if ({}) {{\n{}{}}}\n{}else {{\n{}    {};\n{}}}", condition, self.output_multiple(function, &mut multiple_block.handled, target_block_index, indents + 1), indent, indent, indent, output_branchmode(branch_mode, instruction.next), indent);
                                     simple_block.immediate = None;
+                                    simple_block.branches.clear();
                                     return output;
                                 }
                             }
@@ -428,7 +453,10 @@ impl GlulxOutput {
                         // Both target and next are in the branches map
                         if let Some(target_branch_mode) = simple_block.branches.get(&addr) {
                             if let Some(next_branch_mode) = simple_block.branches.get(&instruction.next) {
-                                return format!("if ({}) {{\n{}    {};\n{}}}\n{}else {{\n{}    {};\n{}}}", condition, indent, output_branchmode(target_branch_mode, addr), indent, indent, indent, output_branchmode(next_branch_mode, instruction.next), indent);
+                                assert!(simple_block.branches.len() == 2, "Unhandled branch");
+                                let output = format!("if ({}) {{\n{}    {};\n{}}}\n{}else {{\n{}    {};\n{}}}", condition, indent, output_branchmode(target_branch_mode, addr), indent, indent, indent, output_branchmode(next_branch_mode, instruction.next), indent);
+                                simple_block.branches.clear();
+                                return output;
                             }
                         }
 

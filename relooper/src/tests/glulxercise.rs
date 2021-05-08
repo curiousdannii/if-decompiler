@@ -95,19 +95,19 @@ fn looksub() {
                     next: None,
                 }))),
             })),
-            next: None,
+            next: Some(Box::new(Simple(SimpleBlock {
+                label: 3808,
+                immediate: Some(Box::new(Multiple(MultipleBlock {
+                    handled: vec![
+                        basic_handled(3818, end_node(3818, Some(branch_to(3833, MergedBranch)))),
+                    ],
+                }))),
+                branches: branch_to(3833, MergedBranch),
+                next: Some(Box::new(end_node(3833, None))),
+            }))),
         }))),
         branches: FnvHashMap::default(),
-        next: Some(Box::new(Simple(SimpleBlock {
-            label: 3808,
-            immediate: Some(Box::new(Multiple(MultipleBlock {
-                handled: vec![
-                    basic_handled(3818, end_node(3818, Some(branch_to(3833, MergedBranch)))),
-                ],
-            }))),
-            branches: branch_to(3833, MergedBranch),
-            next: Some(Box::new(end_node(3833, None))),
-        }))),
+        next: None,
     })));
 }
 
@@ -198,7 +198,7 @@ fn tokenise() {
             branches: branch_to(1198, LoopBreak(loop1139id)),
             next: None
         })),
-        next: None,
+        next: Some(Box::new(end_node(1198, Some(branch_to(990, LoopContinue(loop990id)))))),
     }));
 
     let loop1054 = Box::new(Loop(LoopBlock {
@@ -234,9 +234,9 @@ fn tokenise() {
                 ],
             }))),
             branches: branch_to(1139, LoopBreak(loop1054id)),
-            next: Some(Box::new(end_node(1198, Some(branch_to(990, LoopContinue(loop990id)))))),
+            next: None,
         })),
-        next: None,
+        next: Some(loop1139),
     }));
 
     let loop990 = Box::new(Loop(LoopBlock {
@@ -257,7 +257,7 @@ fn tokenise() {
                             label: 1045,
                             immediate: Some(loop1054),
                             branches: FnvHashMap::default(),
-                            next: Some(loop1139),
+                            next: None,
                         }))),
                     })),
                 ],
@@ -265,7 +265,7 @@ fn tokenise() {
             branches: branch_to(1254, LoopBreak(loop990id)),
             next: None,
         })),
-        next: None,
+        next: Some(Box::new(end_node(1254, None))),
     }));
 
     let loop840branch = branch_to(892, LoopBreakIntoMulti(loop840id));
@@ -412,20 +412,20 @@ fn tokenise() {
                 branches: branch_to(959, MergedBranchIntoMulti),
                 next: None,
             })),
-            next: None,
+            next: Some(Box::new(Multiple(MultipleBlock {
+                handled: vec![
+                    basic_handled_without_break(792, end_node(792, Some(branch_to(959, MergedBranchIntoMulti)))),
+                    basic_handled(959, Simple(SimpleBlock {
+                        label: 959,
+                        immediate: Some(loop990),
+                        branches: FnvHashMap::default(),
+                        next: None,
+                    })),
+                ],
+            }))),
         }))),
         branches: FnvHashMap::default(),
-        next: Some(Box::new(Multiple(MultipleBlock {
-            handled: vec![
-                basic_handled_without_break(792, end_node(792, Some(branch_to(959, MergedBranchIntoMulti)))),
-                basic_handled(959, Simple(SimpleBlock {
-                    label: 959,
-                    immediate: Some(loop990),
-                    branches: FnvHashMap::default(),
-                    next: Some(Box::new(end_node(1254, None))),
-                })),
-            ],
-        }))),
+        next: None,
     }));
 
     let result727 = reloop(input727, 727);

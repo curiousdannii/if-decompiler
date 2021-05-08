@@ -277,8 +277,8 @@ impl<L: RelooperLabel> Relooper<L> {
                         while let Some((edge, _)) = edges.next(&self.graph) {
                             self.graph[edge] = Edge::LoopBreak(loop_id);
                         }
-                        // Add an edge to the loop/its parent
-                        if loop_at_root {
+                        // Add an edge to the loop or its parent in the case of a LoopMulti
+                        if loop_headers.len() == 1 {
                             self.graph.update_edge(loop_node, node, Edge::Next);
                         }
                         else {

@@ -139,10 +139,10 @@ fn test_basic_loops() {
                 branches: branch_to(4, LoopBreak(0)),
                 next: None,
             })),
-            next: None,
+            next: Some(Box::new(end_node(4, None))),
         }))),
         branches: FnvHashMap::default(),
-        next: Some(Box::new(end_node(4, None))),
+        next: None,
     })));
 
     let blocks = make_btree(hashmap!{
@@ -172,10 +172,10 @@ fn test_basic_loops() {
                 branches: FnvHashMap::default(),
                 next: None,
             })),
-            next: None,
+            next: Some(Box::new(end_node(4, None))),
         }))),
         branches: FnvHashMap::default(),
-        next: Some(Box::new(end_node(4, None))),
+        next: None,
     })));
 
     // Test a self loop
@@ -230,10 +230,10 @@ fn test_basic_loops() {
                 branches: branch_to(786, LoopBreak(0)),
                 next: None,
             })),
-            next: None,
+            next: Some(Box::new(end_node(786, None))),
         }))),
         branches: FnvHashMap::default(),
-        next: Some(Box::new(end_node(786, None))),
+        next: None,
     })));
 }
 

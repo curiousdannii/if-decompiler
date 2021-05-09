@@ -308,7 +308,7 @@ impl GlulxOutput {
                     (String::new(), String::new(), provided_args)
                 },
             };
-            return format!("({}CALL_FUNC_VARARGS(({}PushStack({}), VM_FUNC_{}()), {}))", prelude, processed_args, provided_args, callee_addr, pre_pushed_args);
+            return format!("({}CALL_FUNC(({}PushStack({}), VM_FUNC_{}()), {}))", prelude, processed_args, provided_args, callee_addr, pre_pushed_args);
         }
 
         // Account for extra args
@@ -344,8 +344,7 @@ impl GlulxOutput {
         if prelude != "" {
             prelude = format!("{}, ", prelude);
         }
-        format!("({}CALL_FUNC(VM_FUNC_{}({})))", prelude, callee_addr, new_operands.join(", "))
-        //format!("CALL_FUNC(VM_FUNC_{}({}))", callee_addr, args.join(", "))
+        format!("({}CALL_FUNC(VM_FUNC_{}({}), 0))", prelude, callee_addr, new_operands.join(", "))
     }
 
     fn output_callf_safe(&self, instruction: &Instruction, mut operands: Vec<String>) -> String {
@@ -370,10 +369,10 @@ impl GlulxOutput {
                 };
                 let callee = &self.state.functions[&callee_addr];
                 if callee.argument_mode == FunctionArgumentMode::Stack {
-                    format!("(arg = {}, CALL_FUNC_VARARGS((PushStack(arg), VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS({}, arg)), arg))", count, addr)
+                    format!("(arg = {}, CALL_FUNC(VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS({}, arg), arg))", count, addr)
                 }
                 else {
-                    format!("CALL_FUNC(VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS({}, {}))", addr, count)
+                    format!("CALL_FUNC(VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS({}, {}), 0)", addr, count)
                 }
             },
         }

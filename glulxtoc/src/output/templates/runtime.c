@@ -472,7 +472,8 @@ int VM_BRANCH(glui32 offset, glui32 next) {
 
 int VM_CALL_FUNCTION(glui32 addr, glui32 count, glui32 storetype, glui32 storeval, glui32 next) {
     if (VM_FUNC_IS_SAFE(addr)) {
-        glui32 result = VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(addr, count);
+        glui32 result, oldsp, oldvsb, res;
+        result = CALL_FUNC(VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(addr, count), count);
         store_operand(storetype, storeval, result);
         return 0;
     }
@@ -505,7 +506,8 @@ int VM_JUMP_CALL(glui32 pc) {
 
 void VM_TAILCALL_FUNCTION(glui32 addr, glui32 count) {
     if (VM_FUNC_IS_SAFE(addr)) {
-        glui32 result = VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(addr, count);
+        glui32 result, oldsp, oldvsb, res;
+        result = CALL_FUNC(VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(addr, count), count);
         leave_function();
         if (stackptr != 0) {
             pop_callstub(result);

@@ -13,8 +13,7 @@ https://github.com/curiousdannii/if-decompiler
 
 #define ReadLocal(addr) (Stk4(addr + localsbase))
 
-#define CALL_FUNC(code) (oldsp = stackptr, oldvsb = valstackbase, res = code, stackptr = oldsp, valstackbase = oldvsb, res)
-#define CALL_FUNC_VARARGS(code, pre_pushed_args) (oldsp = stackptr, oldvsb = valstackbase, valstackbase = stackptr - pre_pushed_args * 4, res = code, stackptr = oldsp - pre_pushed_args * 4, valstackbase = oldvsb, res)
+#define CALL_FUNC(code, pre_pushed_args) (oldsp = stackptr, oldvsb = valstackbase, valstackbase = stackptr - pre_pushed_args * 4, res = code, stackptr = oldsp - pre_pushed_args * 4, valstackbase = oldvsb, res)
 
 // functions_safe.c
 extern int VM_FUNC_IS_SAFE(glui32 addr);

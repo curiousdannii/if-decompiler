@@ -42,6 +42,14 @@ struct Cli {
     /// Disassembler mode - only disassemble, do not optimise or generate structured code
     #[structopt(short, long)]
     disassemble: bool,
+
+    /// Safe function overrides
+    #[structopt(long, use_delimiter = true)]
+    safe_function_overrides: Option<Vec<u32>>,
+
+    /// Unsafe function overrides
+    #[structopt(long, use_delimiter = true)]
+    unsafe_function_overrides: Option<Vec<u32>>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -87,7 +95,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Decompile the storyfile
     let start_disassemble = Instant::now();
-    let mut decompiler = if_decompiler::glulx::GlulxState::new(data.into_boxed_slice(), debug_function_data);
+    let mut decompiler = if_decompiler::glulx::GlulxState::new(data.into_boxed_slice(), debug_function_data, args.safe_function_overrides, args.unsafe_function_overrides);
     decompiler.decompile_rom();
     let duration = start_disassemble.elapsed();
     println!("Time disassembling the storyfile: {:?}", duration);

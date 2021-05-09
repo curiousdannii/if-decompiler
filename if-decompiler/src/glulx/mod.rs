@@ -23,14 +23,18 @@ pub struct GlulxState {
     pub debug_function_data: Option<BTreeMap<u32, DebugFunctionData>>,
     pub functions: BTreeMap<u32, Function>,
     pub image: Box<[u8]>,
+    pub safe_function_overides: Option<Vec<u32>>,
+    pub unsafe_function_overides: Option<Vec<u32>>,
 }
 
 impl GlulxState {
-    pub fn new(image: Box<[u8]>, debug_function_data: Option<BTreeMap<u32, DebugFunctionData>>) -> GlulxState {
+    pub fn new(image: Box<[u8]>, debug_function_data: Option<BTreeMap<u32, DebugFunctionData>>, safe_function_overides: Option<Vec<u32>>, unsafe_function_overides: Option<Vec<u32>>) -> GlulxState {
         GlulxState {
             debug_function_data,
             functions: BTreeMap::default(),
             image,
+            safe_function_overides,
+            unsafe_function_overides,
         }
     }
 

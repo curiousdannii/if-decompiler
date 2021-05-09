@@ -6,6 +6,8 @@ while [[ "$#" -gt 0 ]]; do
     case $1 in
         -d|--disassemble) DISASSEMBLE=1; ;;
         -f|--file) FILE="$2"; shift ;;
+        -s|--safe-funcs) SAFE_FUNCS="--safe-function-overrides=$2"; shift ;;
+        -u|--unsafe-funcs) UNSAFE_FUNCS="--unsafe-function-overrides=$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -22,7 +24,7 @@ if [ -f "$FILE.gameinfo.dbg" ]; then
     DEBUG="--debug-file=$FILE.gameinfo.dbg"
 fi
 
-cargo run --bin glulxtoc -- $FILE --out-dir=$OUTDIR $DISFLAG $DEBUG
+cargo run --bin glulxtoc -- $FILE --out-dir=$OUTDIR $DISFLAG $DEBUG $SAFE_FUNCS $UNSAFE_FUNCS
 
 CHEAPGLK="$OUTDIR/cheapglk"
 mkdir -p $CHEAPGLK

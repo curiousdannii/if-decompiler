@@ -288,9 +288,7 @@ impl GlulxState {
             self.disassemble_instruction(cursor);
         }
 
-        // Add to the DisassemblyGraph's list of unsafe functions
-        let safety = opcodes::function_safety(&instructions);
-
+        let safety = self.function_safety(addr, &instructions);
         let blocks = calculate_basic_blocks(instructions, entry_points, exit_branches);
 
         Function {
@@ -387,6 +385,21 @@ impl GlulxState {
             storer2,
             next: cursor.position() as u32,
         }
+    }
+
+    // Check the function safety overrides
+    fn function_safety(&self, addr: u32, instructions: &Vec<Instruction>) -> FunctionSafety {
+        if let Some(functions) = &self.safe_function_overides {
+            if functions.contains(&addr) {
+                return FunctionSafety::SafetyTBD;
+            }
+        }
+        if let Some(functions) = &self.unsafe_function_overides {
+            if functions.contains(&addr) {
+                return FunctionSafety::Unsafe;
+            }
+        }
+        opcodes::function_safety(instructions)
     }
 }
 

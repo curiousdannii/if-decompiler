@@ -60,7 +60,20 @@ void execute_loop(void) {{
             }
         }
 
-        write!(code_file, "            default:
+        write!(code_file, "            case STREAM_HANDLER_FAKE_FUNCTION:
+                temp0 = PopStack();
+                temp1 = PopStack();
+                pc = STREAM_HANDLER_RETURN;
+                switch (temp0) {{
+                    case STREAM_CHAR: (*stream_char_handler)(temp1 & 0xFF); break;
+                    case STREAM_NUM: stream_num((glsi32) temp1, 0, 0); break;
+                    case STREAM_STRING: stream_string(temp1, 0, 0); break;
+                    case STREAM_UNICHAR: (*stream_unichar_handler)(temp1); break;
+                }}
+                break;
+            case STREAM_HANDLER_RETURN:
+                return;
+            default:
                 // Try to recover - if we are jumping into the first address of a safe function we can tailcall it
                 if (VM_JUMP_CALL(pc)) {{
                     break;
@@ -90,10 +103,10 @@ void execute_loop(void) {{
             OP_THROW => format!("temp0 = {}; stackptr = {}; pop_callstub(temp0); break", op_a, operands[1]),
             OP_COPYS => self.output_copys_unsafe(instruction),
             OP_COPYB => self.output_copyb_unsafe(instruction),
-            OP_STREAMCHAR => format!("if (OP_STREAMX(0, {}, {})) {{break;}}", op_a, instruction.next),
-            OP_STREAMNUM => format!("if (OP_STREAMX(1, {}, {})) {{break;}}", op_a, instruction.next),
-            OP_STREAMSTR => format!("if (OP_STREAMX(2, {}, {})) {{break;}}", op_a, instruction.next),
-            OP_STREAMUNICHAR => format!("if (OP_STREAMX(3, {}, {})) {{break;}}", op_a, instruction.next),
+            OP_STREAMCHAR => format!("if (OP_STREAMX_UNSAFE(STREAM_CHAR, {}, {})) {{break;}}", op_a, instruction.next),
+            OP_STREAMNUM => format!("if (OP_STREAMX_UNSAFE(STREAM_NUM, {}, {})) {{break;}}", op_a, instruction.next),
+            OP_STREAMSTR => format!("if (OP_STREAMX_UNSAFE(STREAM_STRING, {}, {})) {{break;}}", op_a, instruction.next),
+            OP_STREAMUNICHAR => format!("if (OP_STREAMX_UNSAFE(STREAM_UNICHAR, {}, {})) {{break;}}", op_a, instruction.next),
             OP_CALLF ..= OP_CALLFIII => self.output_callf_unsafe(instruction, operands),
             OP_GETIOSYS => self.output_double_storer_unsafe(instruction, String::from("stream_get_iosys(&temp0, &temp1)")),
             OP_RESTART => String::from("vm_restart(); break"),

@@ -242,13 +242,56 @@ void OP_STKROLL(glui32 arg0, glui32 arg1) {
     }
 }
 
-int OP_STREAMX(int mode, glui32 val, glui32 next) {
+void OP_STREAMX_SAFE(int mode, glui32 val) {
+    // Shortcut for safe streaming
+    glui32 iosys_mode, iosys_rock;
+    stream_get_iosys(&iosys_mode, &iosys_rock);
+    if (iosys_mode != 1 /* iosys_Filter */) {
+        switch (mode) {
+            case STREAM_CHAR: (*stream_char_handler)(val & 0xFF); return;
+            case STREAM_NUM: stream_num((glsi32) val, 0, 0); return;
+            case STREAM_UNICHAR: (*stream_unichar_handler)(val); return;
+        }
+    }
+
+    // Save the current stack
+    glui32 oldframeptr = frameptr;
+    glui32 oldlocalsbase = localsbase;
+    unsigned char *oldstack = stack;
+    glui32 oldstackptr = stackptr;
+    glui32 oldstacksize = stacksize;
+    glui32 oldvalstackbase = valstackbase;
+
+    // Pretend we're calling execute_loop for the very first time
+    stack += stackptr;
+    stacksize -= stackptr;
+    frameptr = 0;
+    localsbase = 0;
+    stackptr = 0;
+    valstackbase = 0;
+
+    // Fake call the printing handler
+    pc = STREAM_HANDLER_FAKE_FUNCTION;
+    PushStack(val);
+    PushStack(mode);
+    execute_loop();
+
+    // And restore the original stack
+    frameptr = oldframeptr;
+    localsbase = oldlocalsbase;
+    stack = oldstack;
+    stackptr = oldstackptr;
+    stacksize = oldstacksize;
+    valstackbase = oldvalstackbase;
+}
+
+int OP_STREAMX_UNSAFE(int mode, glui32 val, glui32 next) {
     pc = next;
     switch (mode) {
-        case 0: (*stream_char_handler)(val & 0xFF); break;
-        case 1: stream_num((glsi32) val, FALSE, 0); break;
-        case 2: stream_string(val, 0, 0); break;
-        case 3: (*stream_unichar_handler)(val); break;
+        case STREAM_CHAR: (*stream_char_handler)(val & 0xFF); break;
+        case STREAM_NUM: stream_num((glsi32) val, 0, 0); break;
+        case STREAM_STRING: stream_string(val, 0, 0); break;
+        case STREAM_UNICHAR: (*stream_unichar_handler)(val); break;
     }
     return pc != next;
 }
@@ -489,14 +532,23 @@ int VM_CALL_FUNCTION(glui32 addr, glui32 count, glui32 storetype, glui32 storeva
 
 // Try to recover from an invalid unsafe PC by seeing if we can call a safe function
 int VM_JUMP_CALL(glui32 pc) {
-    pc -= 5;
+    // The PC we've been given is the beginning of a function's code
+    // The header is variable length though, so call a helper function to find the function address
+    pc = VM_FUNC_SUBTRACT_HEADER(pc);
     if (VM_FUNC_IS_SAFE(pc)) {
-        glui32 locals = valstackbase - localsbase;
-        glui32 count = locals / 4;
-        // Push the locals in reverse order
-        while (locals > localsbase) {
-            locals -= 4;
-            PushStack(ReadLocal(locals));
+        glui32 count;
+        // Retrieve the stack count for varargs functions
+        if (VM_FUNC_IS_SAFE_VARARGS(pc)) {
+            count = PopStack();
+        }
+        // Or push the locals in reverse order for regular functions
+        else {
+            glui32 locals = valstackbase - localsbase;
+            count = locals / 4;
+            while (locals > 0) {
+                locals -= 4;
+                PushStack(ReadLocal(locals));
+            }
         }
         VM_TAILCALL_FUNCTION(pc, count);
         return 1;

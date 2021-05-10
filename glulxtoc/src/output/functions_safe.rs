@@ -47,10 +47,14 @@ impl GlulxOutput {
         // Output the function bodies
         let mut highest_arg_count = 0;
         let mut varargs_functions = Vec::new();
+        let mut zero_arg_functions = Vec::new();
         for addr in &self.safe_functions {
             let function = &self.state.functions[addr];
             if function.locals > highest_arg_count {
                 highest_arg_count = function.locals;
+            }
+            if function.locals == 0 {
+                zero_arg_functions.push(addr + 3);
             }
             if function.argument_mode == FunctionArgumentMode::Stack {
                 varargs_functions.push(*addr);
@@ -110,6 +114,25 @@ impl GlulxOutput {
         writeln!(code_file, "            return 1;
         default:
             return 0;
+    }}
+}}
+")?;
+
+        // Output the VM_FUNC_SUBTRACT_HEADER function
+        writeln!(code_file, "glui32 VM_FUNC_SUBTRACT_HEADER(glui32 pc) {{
+    switch (pc) {{")?;
+        for row in zero_arg_functions.chunks(5) {
+            write!(code_file, "        ")?;
+            let mut row_str = String::new();
+            for addr in row {
+                row_str.push_str(&format!("case {}: ", addr));
+            }
+            row_str.truncate(row_str.len() - 1);
+            writeln!(code_file, "{}", row_str)?;
+        }
+        writeln!(code_file, "            return pc - 3;
+        default:
+            return pc - 5;
     }}
 }}
 ")?;
@@ -227,10 +250,10 @@ impl GlulxOutput {
             OP_TAILCALL => format!("return {}", self.output_call_on_stack_safe(instruction, op_a, op_b)),
             OP_COPYS => self.output_copys_safe(instruction),
             OP_COPYB => self.output_copyb_safe(instruction),
-            OP_STREAMCHAR => format!("(*stream_char_handler)({} & 0xFF)", op_a),
-            OP_STREAMNUM => format!("stream_num((glsi32) {}, FALSE, 0)", op_a),
-            OP_STREAMSTR => format!("stream_string({}, 0, 0)", op_a),
-            OP_STREAMUNICHAR => format!("(*stream_unichar_handler)({})", op_a),
+            OP_STREAMCHAR => format!("OP_STREAMX_SAFE(STREAM_CHAR, {})", op_a),
+            OP_STREAMNUM => format!("OP_STREAMX_SAFE(STREAM_NUM, {})", op_a),
+            OP_STREAMSTR => format!("OP_STREAMX_SAFE(STREAM_STRING, {})", op_a),
+            OP_STREAMUNICHAR => format!("OP_STREAMX_SAFE(STREAM_UNICHAR, {})", op_a),
             OP_CALLF ..= OP_CALLFIII => self.output_callf_safe(instruction, operands),
             OP_GETIOSYS => self.output_double_storer_safe(instruction, String::from("stream_get_iosys(&temp0, &temp1)")),
             OP_FMOD => self.output_double_storer_safe(instruction, format_safe_stack_pops_expression("OP_FMOD({}, {}, &temp0, &temp1)", &operands)),

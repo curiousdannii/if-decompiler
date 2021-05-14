@@ -42,6 +42,7 @@ pub fn reloop<L: RelooperLabel>(blocks: BTreeMap<L, Vec<L>>, first_label: L) -> 
     let mut relooper = Relooper::new(blocks, first_label);
     relooper.process_loops();
     relooper.process_rejoined_branches();
+    relooper.pull_out_nodes_from_loops();
     relooper.output(vec![relooper.graph_root]).unwrap()
 }
 
@@ -135,6 +136,7 @@ struct Relooper<L: RelooperLabel> {
     counter: LoopId,
     graph: Graph<Node<L>, Edge<L>>,
     graph_root: NodeIndex,
+    nodes_to_pull_out: Vec<(NodeIndex, NodeIndex, LoopId)>,
     root: NodeIndex,
 }
 
@@ -163,6 +165,7 @@ impl<L: RelooperLabel> Relooper<L> {
             counter: 0,
             graph,
             graph_root,
+            nodes_to_pull_out: Vec::new(),
             root: nodes[&root_label],
         }
     }
@@ -258,12 +261,22 @@ impl<L: RelooperLabel> Relooper<L> {
 
                                 // Not dominated, so convert the edges
                                 set_next_to_undominated = true;
-                                self.graph[edge] = Edge::LoopBreak(loop_id);
                                 // Add a next edge to the dominator if there isn't one already
                                 let dominator = dominators.immediate_dominator(target).unwrap();
                                 if !self.graph.contains_edge(dominator, target) {
                                     self.graph.add_edge(dominator, target, Edge::Next);
                                 }
+                                // Check if the loop already has a next to something else
+                                let mut into_multi = false;
+                                for edge in self.graph.edges(dominator) {
+                                    if let Edge::Next = edge.weight() {
+                                        if edge.target() != target {
+                                            into_multi = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                self.graph[edge] = if into_multi { Edge::LoopBreakIntoMulti(loop_id) } else { Edge::LoopBreak(loop_id) };
                             }
                         }
                     }
@@ -272,19 +285,8 @@ impl<L: RelooperLabel> Relooper<L> {
                 // If we didn't set the next node to an un-dominated node we can potentially pull out one non-scc node instead
                 if !set_next_to_undominated {
                     if let Some(node) = potential_next {
-                        // Patch incoming edges to the node
-                        let mut edges = self.graph.neighbors_directed(node, Incoming).detach();
-                        while let Some((edge, _)) = edges.next(&self.graph) {
-                            self.graph[edge] = Edge::LoopBreak(loop_id);
-                        }
-                        // Add an edge to the loop or its parent in the case of a LoopMulti
-                        if loop_headers.len() == 1 {
-                            self.graph.update_edge(loop_node, node, Edge::Next);
-                        }
-                        else {
-                            let loop_parent = dominators.immediate_dominator(loop_node).unwrap();
-                            self.graph.update_edge(loop_parent, node, Edge::Next);
-                        }
+                        // Record the node and its loop so it can be pulled out later
+                        self.nodes_to_pull_out.push((node, if loop_headers.len() > 1 { dominators.immediate_dominator(loop_node).unwrap() } else { loop_node }, loop_id));
                     }
                 }
             }
@@ -399,6 +401,24 @@ impl<L: RelooperLabel> Relooper<L> {
 
             let loop_parents_test = |i| loop_parents.contains(&i);
             self.make_loop(&loop_headers, &loop_parents, &loop_headers, loop_parents_test);*/
+        }
+    }
+
+    // Pull out the nodes we recorded earlier from their loops
+    fn pull_out_nodes_from_loops(&mut self) {
+        'top_loop: for &(node, dominator, loop_id) in &self.nodes_to_pull_out {
+            // Check the dominator (the loop or its parent in the case of a LoopMulti) doesn't have a Next node
+            for edge in self.graph.edges(dominator) {
+                if let Edge::Next = edge.weight() {
+                    continue 'top_loop;
+                }
+            }
+            // Patch incoming edges to the node
+            let mut edges = self.graph.neighbors_directed(node, Incoming).detach();
+            while let Some((edge, _)) = edges.next(&self.graph) {
+                self.graph[edge] = Edge::LoopBreak(loop_id);
+            }
+            self.graph.update_edge(dominator, node, Edge::Next);
         }
     }
 

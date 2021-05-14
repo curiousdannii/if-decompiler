@@ -357,7 +357,7 @@ fn tokenise() {
                                 label: 892,
                                 immediate: Some(Box::new(Multiple(MultipleBlock {
                                     handled: vec![
-                                        basic_handled(952, end_node(952, Some(branch_to(959, LoopBreakIntoMulti(loop756id))))),
+                                        basic_handled(952, end_node(952, Some(branch_to(959, LoopBreak(loop756id))))),
                                         basic_handled(955, end_node(955, Some(branch_to(749, LoopContinue(loop749id))))),
                                     ],
                                 }))),
@@ -369,7 +369,7 @@ fn tokenise() {
                 })),
             ],
         }))),
-        branches: branch_to(792, LoopBreakIntoMulti(loop749id)),
+        branches: branch_to(792, LoopBreak(loop749id)),
         next: None,
     }));
 
@@ -409,20 +409,15 @@ fn tokenise() {
                         basic_handled(756, *blocks756),
                     ],
                 }))),
-                branches: branch_to(959, MergedBranchIntoMulti),
-                next: None,
+                branches: branch_to(959, MergedBranch),
+                next: Some(Box::new(Simple(SimpleBlock {
+                    label: 959,
+                    immediate: Some(loop990),
+                    branches: FnvHashMap::default(),
+                    next: None,
+                }))),
             })),
-            next: Some(Box::new(Multiple(MultipleBlock {
-                handled: vec![
-                    basic_handled_without_break(792, end_node(792, Some(branch_to(959, MergedBranchIntoMulti)))),
-                    basic_handled(959, Simple(SimpleBlock {
-                        label: 959,
-                        immediate: Some(loop990),
-                        branches: FnvHashMap::default(),
-                        next: None,
-                    })),
-                ],
-            }))),
+            next: Some(Box::new(end_node(792, Some(branch_to(959, LoopBreak(loop756id)))))),
         }))),
         branches: FnvHashMap::default(),
         next: None,

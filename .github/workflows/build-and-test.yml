@@ -13,6 +13,7 @@ jobs:
         with:
           toolchain: stable
       - run: ./tests/download.sh
-      - run: cargo test --package relooper
       - run: cargo build
+      - run: cargo test --package relooper
       - run: ./tests/runtest.sh -f tests/glulxercise.ulx -d
+      - run: ./tests/runtest.sh -f tests/glulxercise.ulx -u 27057

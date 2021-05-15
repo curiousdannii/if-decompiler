@@ -11,6 +11,51 @@ https://github.com/curiousdannii/if-decompiler
 
 use super::*;
 
+// Float
+#[test]
+fn float() {
+    let input64978 = make_btree(hashmap!{
+        64978 => vec![64991, 65011],
+        64991 => vec![65001, 65023],
+        65001 => vec![65011, 65023],
+        65011 => vec![],
+        65023 => vec![],
+    });
+    let result = reloop(input64978, 64978);
+    assert_eq!(result, Box::new(Simple(SimpleBlock {
+        label: 64978,
+        immediate: Some(Box::new(Multiple(MultipleBlock {
+            handled: vec![
+                basic_handled(64991, Simple(SimpleBlock {
+                    label: 64991,
+                    immediate: Some(Box::new(Multiple(MultipleBlock {
+                        handled: vec![
+                            basic_handled(65001, Simple(SimpleBlock {
+                                label: 65001,
+                                immediate: None,
+                                branches: FnvHashMap::from_iter(vec![
+                                    (65011, MergedBranchIntoMulti),
+                                    (65023, MergedBranchIntoMulti),
+                                ]),
+                                next: None,
+                            })),
+                        ],
+                    }))),
+                    branches: branch_to(65023, MergedBranchIntoMulti),
+                    next: None,
+                })),
+            ],
+        }))),
+        branches: branch_to(65011, MergedBranchIntoMulti),
+        next: Some(Box::new(Multiple(MultipleBlock {
+            handled: vec![
+                basic_handled(65011, end_node(65011, None)),
+                basic_handled(65023, end_node(65023, None)),
+            ],
+        }))),
+    })));
+}
+
 // LookSub
 #[test]
 fn looksub() {

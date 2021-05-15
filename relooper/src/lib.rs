@@ -402,6 +402,60 @@ impl<L: RelooperLabel> Relooper<L> {
             let loop_parents_test = |i| loop_parents.contains(&i);
             self.make_loop(&loop_headers, &loop_parents, &loop_headers, loop_parents_test);*/
         }
+
+        // Find the common dominator of a list of nodes
+        let common_dominator = |first_node: NodeIndex, other_nodes: &Vec<NodeIndex>| -> NodeIndex {
+            'first_node_loop: for dominator in dominators.strict_dominators(first_node).unwrap() {
+                'other_node_loop: for &other_node in other_nodes {
+                    for other_dominator in dominators.strict_dominators(other_node).unwrap() {
+                        if other_dominator == dominator {
+                            continue 'other_node_loop;
+                        }
+                    }
+                    // No matching dominator
+                    continue 'first_node_loop;
+                }
+                // All nodes have dominator as one of their dominators!
+                return dominator;
+            }
+            panic!("Could not find common dominator");
+        };
+
+        // Look for MergedBranch edges which don't go to a Simple node, and fix them
+        for &node in sorted_nodes.iter() {
+            let mut edges = self.graph.neighbors(node).detach();
+            while let Some((edge, target)) = edges.next(&self.graph) {
+                if let Edge::MergedBranch = self.graph[edge] {
+                    let mut next_nodes = self.find_parent_with_bad_next(node, target, &dominators);
+                    if next_nodes.len() > 1 || !next_nodes.contains(&target) {
+                        // Find the common dominator
+                        let new_next_node = common_dominator(target, &next_nodes);
+                        // Now fix up all the affected nodes
+                        next_nodes.insert(0, target);
+                        for node in next_nodes {
+                            // Remove the original Next edges to the target
+                            let mut incoming_edges = self.graph.neighbors_directed(node, Incoming).detach();
+                            while let Some((edge, _)) = incoming_edges.next(&self.graph) {
+                                if let Edge::Next = self.graph[edge] {
+                                    self.graph[edge] = Edge::Removed;
+                                }
+                            }
+                            self.graph.update_edge(new_next_node, node, Edge::Next);
+                            // Replace the incoming edges
+                            let mut incoming_edges = self.graph.neighbors_directed(node, Incoming).detach();
+                            while let Some((edge, _)) = incoming_edges.next(&self.graph) {
+                                match self.graph[edge] {
+                                    Edge::MergedBranch => { self.graph[edge] = Edge::MergedBranchIntoMulti },
+                                    Edge::LoopBreak(loop_id) => { self.graph[edge] = Edge::LoopBreakIntoMulti(loop_id) },
+                                    Edge::LoopContinue(loop_id) => { self.graph[edge] = Edge::LoopContinueIntoMulti(loop_id) },
+                                    _ => {},
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Pull out the nodes we recorded earlier from their loops
@@ -529,6 +583,31 @@ impl<L: RelooperLabel> Relooper<L> {
             }
         }
         return true;
+    }
+
+    // Find a node with Next edges, could be the node itself, or one of its ancestors
+    fn find_parent_with_bad_next (&self, node: NodeIndex, target: NodeIndex, dominators: &algo::dominators::Dominators<NodeIndex>) -> Vec<NodeIndex> {
+        'dom_loop: for dominator in dominators.dominators(node).unwrap() {
+            let mut next_nodes = Vec::new();
+            for edge in self.graph.edges(dominator) {
+                if let Edge::Next = edge.weight() {
+                    if edge.target() == node {
+                        continue 'dom_loop;
+                    }
+                    next_nodes.push(edge.target());
+                }
+            }
+            next_nodes.sort();
+            next_nodes.dedup();
+            // It's actually okay to skip over a Next that goes to a Multiple
+            if next_nodes.len() > 1 && !next_nodes.contains(&target) {
+                continue;
+            }
+            if next_nodes.len() > 0 {
+                return next_nodes;
+            }
+        }
+        panic!("No dominator of {:?} found with Next", node);
     }
 
     fn get_basic_node_label(&self, id: NodeIndex) -> L {

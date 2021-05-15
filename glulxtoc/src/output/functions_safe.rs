@@ -426,6 +426,17 @@ impl GlulxOutput {
                                     simple_block.immediate = None;
                                     return output;
                                 }
+                                // We can also jump into a Loop(Simple)
+                                if let Loop(loop_block) = immediate_block {
+                                    if let Simple(inner_block) = &*loop_block.inner {
+                                        if inner_block.label == addr {
+                                            assert!(simple_block.branches.len() == 0, "Unhandled branch");
+                                            let output = format!("/* Jumping into immediate */\n{}", self.output_shaped_block(function, immediate_block, indents));
+                                            simple_block.immediate = None;
+                                            return output;
+                                        }
+                                    }
+                                }
                             }
                         }
 

@@ -18,7 +18,6 @@ https://github.com/emscripten-core/emscripten/blob/master/docs/paper.pdf
 #![forbid(unsafe_code)]
 
 use core::hash::Hash;
-use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 
@@ -38,7 +37,7 @@ where T: Copy + Debug + Eq + Hash + Ord {}
 type LoopId = u16;
 
 // The Relooper accepts a map of block labels to the labels each block can branch to
-pub fn reloop<L: RelooperLabel>(blocks: BTreeMap<L, Vec<L>>, first_label: L) -> Box<ShapedBlock<L>> {
+pub fn reloop<L: RelooperLabel>(blocks: Vec<(L, Vec<L>)>, first_label: L) -> Box<ShapedBlock<L>> {
     let mut relooper = Relooper::new(blocks, first_label);
     relooper.process_loops();
     relooper.process_rejoined_branches();
@@ -141,13 +140,13 @@ struct Relooper<L: RelooperLabel> {
 }
 
 impl<L: RelooperLabel> Relooper<L> {
-    fn new(blocks: BTreeMap<L, Vec<L>>, root_label: L) -> Relooper<L> {
+    fn new(blocks: Vec<(L, Vec<L>)>, root_label: L) -> Relooper<L> {
         let mut graph = Graph::new();
         let mut nodes = FnvHashMap::default();
 
         // Add nodes for each block
-        for (&label, branches) in &blocks {
-            nodes.insert(label, graph.add_node(if branches.len() > 1 { Node::Multiple(label) } else { Node::Basic(label) }));
+        for (label, branches) in &blocks {
+            nodes.insert(*label, graph.add_node(if branches.len() > 1 { Node::Multiple(*label) } else { Node::Basic(*label) }));
         }
 
         // Add the edges
@@ -239,7 +238,8 @@ impl<L: RelooperLabel> Relooper<L> {
 
                         let mut edges = self.graph.neighbors(node).detach();
                         'edge_loop: while let Some((edge, target)) = edges.next(&self.graph) {
-                            if let Edge::Forward = self.graph[edge] {
+                            // Look for not just Forward edges, but also LoopBreaks from a previous loop
+                            if let Edge::Forward | Edge::ForwardMulti(_) | Edge::LoopBreak(_) | Edge::LoopBreakIntoMulti(_) = self.graph[edge] {
                                 // When the root node is a loop there can't be any un-dominated nodes, so just push to the stack
                                 if loop_at_root {
                                     if !discovered.is_visited(&target) {

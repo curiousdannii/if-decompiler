@@ -17,3 +17,4 @@ jobs:
       - run: cargo test --package relooper
       - run: ./tests/runtest.sh -f tests/glulxercise.ulx -d
       - run: ./tests/runtest.sh -f tests/glulxercise.ulx -u 27057
+      - run: ./tests/runtest.sh -f tests/advent.ulx

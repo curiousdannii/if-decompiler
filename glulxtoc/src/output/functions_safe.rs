@@ -59,14 +59,14 @@ impl GlulxOutput {
                 varargs_functions.push(*addr);
             }
 
-            let args_list = if function.argument_mode == FunctionArgumentMode::Stack { String::from("void") } else { function_arguments(function.locals, true, ",") };
+            let args_list = if function.argument_mode == FunctionArgumentMode::Stack { String::from("void") } else { function_arguments(function.locals, true, false) };
             let function_spec = format!("glui32 VM_FUNC_{}({})", addr, args_list);
             let name_comment = self.state.debug_function_data.as_ref().map_or(String::new(), |functions| format!("// VM Function {} ({})\n", addr, functions.get(addr).unwrap().name));
 
             writeln!(code_file, "{}{} {{
     glui32 arg, label = 0, oldsp, oldvsb, res, temp0, temp1, temp2, temp3, temp4, temp5;", name_comment, function_spec)?;
             if function.argument_mode == FunctionArgumentMode::Stack {
-                writeln!(code_file, "    glui32 {};", function_arguments(function.locals, false, ","))?;
+                writeln!(code_file, "    glui32 {};", function_arguments(function.locals, false, true))?;
             } else {
                 writeln!(code_file, "    valstackbase = stackptr;")?;
             }
@@ -138,18 +138,18 @@ impl GlulxOutput {
 
         // Output the VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS function
         writeln!(code_file, "glui32 VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(glui32 addr, glui32 count) {{
-    {};
+    glui32 {};
     if (VM_FUNC_IS_SAFE_VARARGS(addr)) {{
         PushStack(count);
     }}
-    else {{", function_arguments(highest_arg_count, true, ";"))?;
+    else {{", function_arguments(highest_arg_count, false, true))?;
         for i in 0..highest_arg_count {
             writeln!(code_file, "        if (count > {}) {{ l{} = PopStack(); }}", i, i)?;
         }
         writeln!(code_file, "    }}\n    switch (addr) {{")?;
         for addr in &self.safe_functions {
             let function = &self.state.functions[addr];
-            let args_list = if function.argument_mode == FunctionArgumentMode::Stack { String::new() } else { function_arguments(function.locals, false, ",") };
+            let args_list = if function.argument_mode == FunctionArgumentMode::Stack { String::new() } else { function_arguments(function.locals, false, false) };
             writeln!(code_file, "        case {}: return VM_FUNC_{}({});", addr, addr, args_list)?;
         }
         write!(code_file, "        default: fatal_error_i(\"VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS called with non-safe function address:\", addr);
@@ -556,13 +556,20 @@ fn find_multiple(handled: &Vec<HandledBlock<u32>>, label: u32) -> Option<usize> 
     None
 }
 
-fn function_arguments(count: u32, include_types: bool, separator: &str) -> String {
+fn function_arguments(count: u32, include_types: bool, include_initialiser: bool) -> String {
     let mut output = String::new();
     if count == 0 {
         return String::from(if include_types {"void"} else {""});
     }
     for arg in 0..count {
-        output.push_str(&format!("{}l{}{} ", if include_types {"glui32 "} else {""}, arg, separator));
+        if include_types {
+            output.push_str("glui32 ");
+        }
+        output.push_str(&format!("l{}", arg));
+        if include_initialiser {
+            output.push_str(" = 0");
+        }
+        output.push_str(", ");
     }
     output.truncate(output.len() - 2);
 

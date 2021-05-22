@@ -36,5 +36,6 @@ add_sources(NAME "OUTDIR/"
 target_compile_options(NAME PRIVATE -Wall -Wmissing-prototypes
     -Wstrict-prototypes -Wno-overflow -Wno-unused)
 if (CMAKE_C_COMPILER_ID MATCHES "Clang")
-    target_compile_options(NAME PRIVATE -Wno-constant-conversion -Wno-integer-overflow)
+    target_compile_options(NAME PRIVATE -Wno-constant-conversion -Wno-integer-overflow
+        -Wconditional-uninitialized)
 endif()

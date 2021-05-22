@@ -1,0 +1,23 @@
+** game: advent.ulx
+
+* prologue
+
+Welcome to Adventure!
+
+> east
+You are inside a building, a well house for a large spring.
+
+> get all
+set of keys: Taken.
+
+> west
+> south
+> south
+> south
+> unlock grate with key
+> open it
+> down
+> west
+> west
+> turn on lamp
+A three foot black rod with a rusty star on one end lies nearby.

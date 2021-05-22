@@ -15,6 +15,7 @@ use std::fs::File;
 use std::io::{BufReader, Cursor};
 use std::path::PathBuf;
 use std::time::Instant;
+use std::thread;
 
 use bytes::Buf;
 use quick_xml;
@@ -36,6 +37,10 @@ struct Cli {
     #[structopt(long, parse(from_os_str))]
     out_dir: Option<PathBuf>,
 
+    /// Stack size (MB) (for the glulxtoc app, not the stack of the Glulx file being decompiled)
+    #[structopt(short, long)]
+    stack_size: Option<u32>,
+
     /// Inform debug file
     #[structopt(long, parse(from_os_str))]
     debug_file: Option<PathBuf>,
@@ -53,15 +58,29 @@ struct Cli {
     unsafe_function_overrides: Option<Vec<u32>>,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<std::io::Error>> {
+    // Process arguments
+    let args: Cli = Cli::from_args();
+
+    let child = thread::Builder::new()
+        .name("run".into())
+        .stack_size((args.stack_size.unwrap_or(8) * 1024 * 1024) as usize)
+        .spawn(move || -> Result<(), Box<std::io::Error>> { run(args)?; Ok(()) })
+        .unwrap();
+
+    child.join().unwrap()?;
+
+    Ok(())
+}
+
+fn run(args: Cli) -> Result<(), Box<std::io::Error>> {
     // Find where we are running from
     let mut workspace_dir = env::current_exe()?;
     workspace_dir.pop();
     workspace_dir.pop();
     workspace_dir.pop();
 
-    // Process arguments
-    let args = Cli::from_args();
+    // Start processing args
     let mut storyfile_path = env::current_dir()?;
     storyfile_path.push(args.path);
     let name = storyfile_path.file_stem().expect("storyfile should not be relative").to_str().unwrap().to_string();
@@ -79,6 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Read the storyfile
+    println!("Starting to decompile {:?}", storyfile_path);
     let start = Instant::now();
     let data = std::fs::read(storyfile_path)?;
     let data_length = data.len();
@@ -110,7 +130,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(path) => {
             let start_parse_debug_file = Instant::now();
             let file = File::open(path)?;
-            let result = Some(parse_debug_file(BufReader::new(file))?);
+            let result = Some(parse_debug_file(BufReader::new(file)).expect("Error parsing XML"));
             println!("Time parsing the debug file: {:?}", start_parse_debug_file.elapsed());
             result
         },

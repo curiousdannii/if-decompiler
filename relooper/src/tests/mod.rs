@@ -16,6 +16,7 @@ use BranchMode::*;
 use ShapedBlock::*;
 
 mod glulxercise;
+mod inform6lib;
 
 fn basic_handled<T: RelooperLabel>(label: T, inner: ShapedBlock<T>) -> HandledBlock<T> {
     HandledBlock {
@@ -123,12 +124,13 @@ fn test_basic_loops() {
                             branches: FnvHashMap::default(),
                             next: None,
                         })),
+                        basic_handled(4, end_node(4, None)),
                     ],
                 }))),
-                branches: branch_to(4, LoopBreak(0)),
+                branches: FnvHashMap::default(),
                 next: None,
             })),
-            next: Some(Box::new(end_node(4, None))),
+            next: None,
         }))),
         branches: FnvHashMap::default(),
         next: None,
@@ -153,15 +155,16 @@ fn test_basic_loops() {
                     immediate: Some(Box::new(Multiple(MultipleBlock {
                         handled: vec![
                             basic_handled(3, end_node(3, Some(branch_to(1, LoopContinue(0))))),
+                            basic_handled(4, end_node(4, None)),
                         ],
                     }))),
-                    branches: branch_to(4, LoopBreak(0)),
+                    branches: FnvHashMap::default(),
                     next: None,
                 }))),
                 branches: FnvHashMap::default(),
                 next: None,
             })),
-            next: Some(Box::new(end_node(4, None))),
+            next: None,
         }))),
         branches: FnvHashMap::default(),
         next: None,
@@ -177,14 +180,15 @@ fn test_basic_loops() {
         loop_id: 0,
         inner: Box::new(Simple(SimpleBlock {
             label: 0,
-            immediate: None,
-            branches: FnvHashMap::from_iter(vec![
-                (0, LoopContinue(0)),
-                (1, LoopBreak(0)),
-            ]),
+            immediate: Some(Box::new(Multiple(MultipleBlock {
+                handled: vec![
+                    basic_handled(1, end_node(1, None)),
+                ],
+            }))),
+            branches: branch_to(0, LoopContinue(0)),
             next: None,
         })),
-        next: Some(Box::new(end_node(1, None))),
+        next: None,
     })));
 
     // Multiple breaks to a dominated node from a loop (a little excerpt from the Glulxercise Tokenise test)
@@ -211,15 +215,15 @@ fn test_basic_loops() {
                                     basic_handled(777, end_node(777, Some(branch_to(756, LoopContinue(0))))),
                                 ],
                             }))),
-                            branches: branch_to(786, LoopBreak(0)),
+                            branches: branch_to(786, MergedBranch),
                             next: None,
                         })),
                     ],
                 }))),
-                branches: branch_to(786, LoopBreak(0)),
-                next: None,
+                branches: branch_to(786, MergedBranch),
+                next: Some(Box::new(end_node(786, None))),
             })),
-            next: Some(Box::new(end_node(786, None))),
+            next: None,
         }))),
         branches: FnvHashMap::default(),
         next: None,
@@ -317,12 +321,13 @@ fn test_nested_loops() {
                         })),
                         next: None,
                     })),
+                    basic_handled(3, end_node(3, None)),
                 ],
             }))),
-            branches: branch_to(3, LoopBreak(0)),
+            branches: FnvHashMap::default(),
             next: None,
         })),
-        next: Some(Box::new(end_node(3, None))),
+        next: None,
     })));
 }
 
@@ -618,17 +623,18 @@ fn test_stackifier_multiloop() {
                 branches: branch_to('G', MergedBranch),
                 next: Some(Box::new(Simple(SimpleBlock {
                     label: 'G',
-                    immediate: None,
-                    branches: FnvHashMap::from_iter(vec![
-                        ('B', LoopContinueIntoMulti(0)),
-                        ('H', LoopBreak(0)),
-                    ]),
+                    immediate: Some(Box::new(Multiple(MultipleBlock {
+                        handled: vec![
+                            basic_handled('H', end_node('H', None)),
+                        ],
+                    }))),
+                    branches: branch_to('B', LoopContinueIntoMulti(0)),
                     next: None,
                 }))),
             }))),
         }))),
         branches: FnvHashMap::default(),
-        next: Some(Box::new(end_node('H', None))),
+        next: None,
     })));
 }
 

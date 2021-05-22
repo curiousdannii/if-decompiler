@@ -132,24 +132,25 @@ fn looksub() {
                 branches: branch_to(3798, MergedBranch),
                 next: Some(Box::new(Simple(SimpleBlock {
                     label: 3798,
-                    immediate: None,
-                    branches: FnvHashMap::from_iter(vec![
-                        (3708, LoopContinue(0)),
-                        (3808, LoopBreak(0)),
-                    ]),
+                    immediate: Some(Box::new(Multiple(MultipleBlock {
+                        handled: vec![
+                            basic_handled(3808, Simple(SimpleBlock {
+                                label: 3808,
+                                immediate: Some(Box::new(Multiple(MultipleBlock {
+                                    handled: vec![
+                                        basic_handled(3818, end_node(3818, Some(branch_to(3833, MergedBranch)))),
+                                    ],
+                                }))),
+                                branches: branch_to(3833, MergedBranch),
+                                next: Some(Box::new(end_node(3833, None))),
+                            })),
+                        ],
+                    }))),
+                    branches: branch_to(3708, LoopContinue(0)),
                     next: None,
                 }))),
             })),
-            next: Some(Box::new(Simple(SimpleBlock {
-                label: 3808,
-                immediate: Some(Box::new(Multiple(MultipleBlock {
-                    handled: vec![
-                        basic_handled(3818, end_node(3818, Some(branch_to(3833, MergedBranch)))),
-                    ],
-                }))),
-                branches: branch_to(3833, MergedBranch),
-                next: Some(Box::new(end_node(3833, None))),
-            }))),
+            next: None,
         }))),
         branches: FnvHashMap::default(),
         next: None,
@@ -238,12 +239,13 @@ fn tokenise() {
                             ],
                         }))),
                     })),
+                    basic_handled(1198, end_node(1198, Some(branch_to(990, LoopContinue(loop990id))))),
                 ],
             }))),
-            branches: branch_to(1198, LoopBreak(loop1139id)),
+            branches: FnvHashMap::default(),
             next: None
         })),
-        next: Some(Box::new(end_node(1198, Some(branch_to(990, LoopContinue(loop990id)))))),
+        next: None,
     }));
 
     let loop1054 = Box::new(Loop(LoopBlock {
@@ -276,12 +278,13 @@ fn tokenise() {
                             ],
                         }))),
                     })),
+                    basic_handled(1139, *loop1139),
                 ],
             }))),
-            branches: branch_to(1139, LoopBreak(loop1054id)),
+            branches: FnvHashMap::default(),
             next: None,
         })),
-        next: Some(loop1139),
+        next: None,
     }));
 
     let loop990 = Box::new(Loop(LoopBlock {
@@ -305,12 +308,13 @@ fn tokenise() {
                             next: None,
                         }))),
                     })),
+                    basic_handled(1254, end_node(1254, None)),
                 ],
             }))),
-            branches: branch_to(1254, LoopBreak(loop990id)),
+            branches: FnvHashMap::default(),
             next: None,
         })),
-        next: Some(Box::new(end_node(1254, None))),
+        next: None,
     }));
 
     let loop840branch = branch_to(892, LoopBreakIntoMulti(loop840id));
@@ -369,6 +373,7 @@ fn tokenise() {
         label: 786,
         immediate: Some(Box::new(Multiple(MultipleBlock {
             handled: vec![
+                basic_handled(792, end_node(792, Some(branch_to(959, LoopBreak(loop756id))))),
                 basic_handled(796, Simple(SimpleBlock {
                     label: 796,
                     immediate: Some(Box::new(Multiple(MultipleBlock {
@@ -414,7 +419,7 @@ fn tokenise() {
                 })),
             ],
         }))),
-        branches: branch_to(792, LoopBreak(loop749id)),
+        branches: FnvHashMap::default(),
         next: None,
     }));
 
@@ -462,7 +467,7 @@ fn tokenise() {
                     next: None,
                 }))),
             })),
-            next: Some(Box::new(end_node(792, Some(branch_to(959, LoopBreak(loop756id)))))),
+            next: None
         }))),
         branches: FnvHashMap::default(),
         next: None,

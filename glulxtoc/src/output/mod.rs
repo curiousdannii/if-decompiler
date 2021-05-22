@@ -18,14 +18,15 @@ use dyn_fmt::AsStrFormatExt;
 use if_decompiler::*;
 use glulx::GlulxState;
 
+mod files;
 mod functions_common;
 mod functions_safe;
 mod functions_unsafe;
 mod image;
-mod templates;
 
 pub struct GlulxOutput {
     pub disassemble_mode: bool,
+    pub file_length: u32,
     pub have_warned_about_dynamic_branches: bool,
     pub name: String,
     pub out_dir: PathBuf,
@@ -37,8 +38,7 @@ pub struct GlulxOutput {
 }
 
 impl GlulxOutput {
-    pub fn new(disassemble_mode: bool, name: String, out_dir: PathBuf, state: GlulxState, workspace_dir: PathBuf) -> GlulxOutput {
-        let ramstart = state.read_addr(8);
+    pub fn new(disassemble_mode: bool, file_length: u32, name: String, out_dir: PathBuf, state: GlulxState, workspace_dir: PathBuf) -> GlulxOutput {
         let mut safe_functions = Vec::new();
         let mut unsafe_functions = Vec::new();
         for (&addr, function) in &state.functions {
@@ -51,10 +51,11 @@ impl GlulxOutput {
         }
         GlulxOutput {
             disassemble_mode,
+            file_length,
             have_warned_about_dynamic_branches: false,
             name,
             out_dir,
-            ramstart,
+            ramstart: state.ramstart,
             safe_functions,
             state,
             unsafe_functions,
@@ -62,12 +63,12 @@ impl GlulxOutput {
         }
     }
 
-    pub fn output(&mut self) -> io::Result<()> {
+    pub fn output(&mut self, file: &[u8]) -> io::Result<()> {
         // Make the output directory if necessary
         fs::create_dir_all(&self.out_dir)?;
 
-        self.output_from_templates()?;
-        self.output_image()?;
+        self.output_from_templates(file.len())?;
+        self.output_image(file)?;
         self.output_safe_functions()?;
         self.output_unsafe_functions()?;
         Ok(())

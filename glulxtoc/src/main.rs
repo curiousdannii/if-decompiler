@@ -12,10 +12,11 @@ https://github.com/curiousdannii/if-decompiler
 use std::collections::BTreeMap;
 use std::env;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Cursor};
 use std::path::PathBuf;
 use std::time::Instant;
 
+use bytes::Buf;
 use quick_xml;
 use structopt::StructOpt;
 
@@ -80,6 +81,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Read the storyfile
     let start = Instant::now();
     let data = std::fs::read(storyfile_path)?;
+    let data_length = data.len();
+
+    // Start parsing the file
+    fn get_file_header(data: &[u8]) -> (u32, u32) {
+        let mut cursor = Cursor::new(data);
+        let magic = cursor.get_u32();
+        cursor.set_position(8);
+        let iff_type = cursor.get_u32();
+        (magic, iff_type)
+    }
+    let (magic, iff_type) = get_file_header(&data);
+
+    // Check for a blorb
+    let image = if magic == 0x464F524D /* FORM */ && iff_type == 0x49465253 /* IFRS */ {
+        parse_blorb(&data)
+    }
+    // A bare Glulx file
+    else if magic == 0x476C756C /* Glul */ {
+        Some(&*data)
+    }
+    else {
+        panic!("Unrecognised file format");
+    };
 
     // Read the debug file if specified
     let debug_function_data = match args.debug_file {
@@ -95,19 +119,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Decompile the storyfile
     let start_disassemble = Instant::now();
-    let mut decompiler = if_decompiler::glulx::GlulxState::new(data.into_boxed_slice(), debug_function_data, args.safe_function_overrides, args.unsafe_function_overrides);
-    decompiler.decompile_rom();
+    let mut decompiler = if_decompiler::glulx::GlulxState::new(debug_function_data, args.safe_function_overrides, args.unsafe_function_overrides);
+    decompiler.decompile_rom(image.unwrap());
     let duration = start_disassemble.elapsed();
     println!("Time disassembling the storyfile: {:?}", duration);
 
     // Output the C files
-    let mut output = output::GlulxOutput::new(args.disassemble, name, out_dir, decompiler, workspace_dir);
-    output.output()?;
+    let mut output = output::GlulxOutput::new(args.disassemble, data_length as u32, name, out_dir, decompiler, workspace_dir);
+    output.output(&data)?;
 
     let duration = start.elapsed();
     println!("Total decompilation time: {:?}", duration);
 
     Ok(())
+}
+
+// Parse a blorb file
+// TODO: parse debug data from blorb
+fn parse_blorb<'a>(data: &'a [u8]) -> Option<&'a [u8]> {
+    let length = data.len() as u64;
+    let mut cursor = Cursor::new(data);
+    cursor.set_position(12);
+    let mut glulx_chunk = None;
+    while cursor.position() < length {
+        let chunk_type = cursor.get_u32();
+        let chunk_length = cursor.get_u32();
+        let chunk_end = cursor.position()as usize + chunk_length as usize;
+        match chunk_type {
+            0x474C554C /* GLUL */ => {
+                glulx_chunk = Some(&data[cursor.position() as usize..chunk_end]);
+            },
+            _ => {},
+        }
+        cursor.set_position(chunk_end as u64);
+    }
+    if glulx_chunk.is_none() {
+        panic!("Blorb file does not have a GLUL chunk");
+    }
+    glulx_chunk
 }
 
 // Parse an Inform debug file

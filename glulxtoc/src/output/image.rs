@@ -15,14 +15,14 @@ use std::time::Instant;
 use super::*;
 
 impl GlulxOutput {
-    pub fn output_image(&self) -> std::io::Result<()> {
+    pub fn output_image(&self, data: &[u8]) -> std::io::Result<()> {
         let start = Instant::now();
 
         let mut file = self.make_file("image.c")?;
 
         writeln!(file, "char GLULX_IMAGE[] = {{")?;
 
-        let image_iter = self.state.image.chunks(16);
+        let image_iter = data.chunks(16);
         for row in image_iter {
             let row_text = format!("{:?}", row);
             writeln!(file, "    {},", &row_text[1..(row_text.len()-1)])?;

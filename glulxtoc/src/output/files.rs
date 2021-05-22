@@ -1,7 +1,7 @@
 /*
 
-Create files from templates
-===========================
+Create files
+============
 
 Copyright (c) 2021 Dannii Willis
 MIT licenced
@@ -13,7 +13,7 @@ use super::*;
 use std::time::Instant;
 
 impl GlulxOutput {
-    pub fn output_from_templates(&self) -> std::io::Result<()> {
+    pub fn output_from_templates(&self, file_length: usize) -> std::io::Result<()> {
         let start = Instant::now();
 
         let templates = [
@@ -23,7 +23,7 @@ impl GlulxOutput {
             "unixstrt.c",
         ];
         let replacements = [
-            ["IMAGE_LENGTH_VALUE", &self.state.image.len().to_string()],
+            ["IMAGE_LENGTH_VALUE", &file_length.to_string()],
             ["NAME", &self.name],
             ["OUTDIR", self.out_dir.to_str().unwrap()],
             ["WORKSPACE", self.workspace_dir.to_str().unwrap()],

@@ -14,16 +14,17 @@ use fnv::FnvHashSet;
 use super::*;
 
 impl GlulxState {
-    pub fn disassemble(&mut self) -> FnvHashSet<(u32, u32)> {
-        let decoding_table = self.parse_string_decoding_table();
+    pub fn disassemble(&mut self, image: &[u8]) -> FnvHashSet<(u32, u32)> {
+        let decoding_table = self.parse_string_decoding_table(image);
 
         let mut edges = FnvHashSet::default();
 
-        let ram_start = self.read_addr(8) as u64;
-        let decoding_table_addr = self.read_addr(28);
-        let root_node_addr = self.read_addr(decoding_table_addr + 8);
+        let ram_start = self.read_addr(image, 8) as u64;
+        self.ramstart = ram_start as u32;
+        let decoding_table_addr = self.read_addr(image, 28);
+        let root_node_addr = self.read_addr(image, decoding_table_addr + 8);
 
-        let mut cursor = Cursor::new(&self.image);
+        let mut cursor = Cursor::new(image);
 
         // If we have debug file data, use it to disassemble all the functions
         if let Some(functions) = &self.debug_function_data {
@@ -119,12 +120,12 @@ impl GlulxState {
     }
 
     // Parse the string decoding table, but only so that we can ignore compressed strings
-    pub fn parse_string_decoding_table(&self) -> FnvHashMap<u32, DecodingNode> {
+    pub fn parse_string_decoding_table(&self, image: &[u8]) -> FnvHashMap<u32, DecodingNode> {
         let mut table = FnvHashMap::default();
-        let mut cursor = Cursor::new(&self.image);
+        let mut cursor = Cursor::new(image);
 
-        let decoding_table_addr = self.read_addr(28);
-        let root_node_addr = self.read_addr(decoding_table_addr + 8);
+        let decoding_table_addr = self.read_addr(image, 28);
+        let root_node_addr = self.read_addr(image, decoding_table_addr + 8);
 
         // Keep a list of nodes to process and loop through
         // I tried doing this recursively but couldn't make it work with the borrow checker
@@ -180,7 +181,7 @@ impl GlulxState {
         table
     }
 
-    fn disassemble_function(&self, cursor: &mut Cursor<&Box<[u8]>>, edges: &mut FnvHashSet<(u32, u32)>, addr: u32, len: Option<u32>, function_mode: u8) -> Function {
+    fn disassemble_function(&self, cursor: &mut Cursor<&[u8]>, edges: &mut FnvHashSet<(u32, u32)>, addr: u32, len: Option<u32>, function_mode: u8) -> Function {
         let argument_mode = match function_mode {
             0xC0 => FunctionArgumentMode::Stack,
             0xC1 => FunctionArgumentMode::Locals,
@@ -300,7 +301,7 @@ impl GlulxState {
         }
     }
 
-    fn disassemble_instruction(&self, cursor: &mut Cursor<&Box<[u8]>>) -> Instruction {
+    fn disassemble_instruction(&self, cursor: &mut Cursor<&[u8]>) -> Instruction {
         use Operand::*;
 
         let addr = cursor.position() as u32;

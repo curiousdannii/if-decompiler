@@ -7,6 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bytes = "1.0.1"
 dyn-fmt = "0.3.0"
 fnv = "1.0.7"
 if-decompiler = {path = "../if-decompiler"}

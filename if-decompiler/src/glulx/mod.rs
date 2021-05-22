@@ -22,29 +22,29 @@ pub mod opcodes;
 pub struct GlulxState {
     pub debug_function_data: Option<BTreeMap<u32, DebugFunctionData>>,
     pub functions: BTreeMap<u32, Function>,
-    pub image: Box<[u8]>,
+    pub ramstart: u32,
     pub safe_function_overides: Option<Vec<u32>>,
     pub unsafe_function_overides: Option<Vec<u32>>,
 }
 
 impl GlulxState {
-    pub fn new(image: Box<[u8]>, debug_function_data: Option<BTreeMap<u32, DebugFunctionData>>, safe_function_overides: Option<Vec<u32>>, unsafe_function_overides: Option<Vec<u32>>) -> GlulxState {
+    pub fn new(debug_function_data: Option<BTreeMap<u32, DebugFunctionData>>, safe_function_overides: Option<Vec<u32>>, unsafe_function_overides: Option<Vec<u32>>) -> Self {
         GlulxState {
             debug_function_data,
             functions: BTreeMap::default(),
-            image,
+            ramstart: 0,
             safe_function_overides,
             unsafe_function_overides,
         }
     }
 
-    pub fn decompile_rom(&mut self) {
-        let edges = self.disassemble();
+    pub fn decompile_rom(&mut self, image: &[u8]) {
+        let edges = self.disassemble(image);
         self.mark_all_unsafe_functions(edges);
     }
 
-    pub fn read_addr(&self, addr: u32) -> u32 {
-        let mut cursor = Cursor::new(&self.image);
+    pub fn read_addr(&self, image: &[u8], addr: u32) -> u32 {
+        let mut cursor = Cursor::new(image);
         cursor.set_position(addr as u64);
         cursor.get_u32()
     }

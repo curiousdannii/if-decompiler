@@ -22,6 +22,8 @@ use super::*;
 
 impl GlulxOutput {
     pub fn output_unsafe_functions(&mut self) -> std::io::Result<()> {
+        print!("Outputting unsafe functions...");
+        io::stdout().flush().unwrap();
         let start = Instant::now();
 
         let mut code_file = self.make_file("functions_unsafe.c")?;
@@ -84,7 +86,7 @@ void execute_loop(void) {{
 }}")?;
 
         let duration = start.elapsed();
-        println!("Time outputting unsafe functions: {:?}", duration);
+        println!(" completed in {:?}", duration);
         Ok(())
     }
 

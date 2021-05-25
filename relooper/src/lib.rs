@@ -152,6 +152,10 @@ impl<L: RelooperLabel> Relooper<L> {
         let mut graph = Graph::new();
         let mut nodes = FnvHashMap::default();
 
+        // Add a root node to the graph, in order to handle when the first label is a loop
+        // Do this now so that it won't be invalidated by deleted orphan nodes
+        let graph_root = graph.add_node(Node::Root);
+
         // Add nodes for each block
         for (label, branches) in &blocks {
             nodes.insert(*label, graph.add_node(if branches.len() > 1 { Node::Multiple(*label) } else { Node::Basic(*label) }));
@@ -164,9 +168,16 @@ impl<L: RelooperLabel> Relooper<L> {
             }
         }
 
-        // Add a root node to the graph, in order to handle when the first label is a loop
-        let graph_root = graph.add_node(Node::Root);
+        // Connect the root node to the first label
         graph.add_edge(graph_root, nodes[&root_label], Edge::Forward);
+
+        // Remove orphan nodes
+        let dominators = algo::dominators::simple_fast(&graph, graph_root);
+        for node in graph.node_indices() {
+            if node != graph_root && dominators.immediate_dominator(node).is_none() {
+                graph.remove_node(node);
+            }
+        }
 
         Relooper {
             counter: 0,

@@ -12,7 +12,8 @@ https://github.com/curiousdannii/if-decompiler
 use std::collections::BTreeMap;
 use std::env;
 use std::fs::File;
-use std::io::{BufReader, Cursor};
+use std::io;
+use std::io::{BufReader, Cursor, Write};
 use std::path::PathBuf;
 use std::time::Instant;
 use std::thread;
@@ -48,6 +49,10 @@ struct Cli {
     /// Disassembler mode - only disassemble, do not optimise or generate structured code
     #[structopt(short, long)]
     disassemble: bool,
+
+    /// Stop disassembling if you reach a string
+    #[structopt(long)]
+    stop_on_string: bool,
 
     /// Safe function overrides
     #[structopt(long, use_delimiter = true)]
@@ -128,21 +133,25 @@ fn run(args: Cli) -> Result<(), Box<std::io::Error>> {
     // Read the debug file if specified
     let debug_function_data = match args.debug_file {
         Some(path) => {
+            print!("Parsing the debug file...");
+            io::stdout().flush().unwrap();
             let start_parse_debug_file = Instant::now();
             let file = File::open(path)?;
             let result = Some(parse_debug_file(BufReader::new(file)).expect("Error parsing XML"));
-            println!("Time parsing the debug file: {:?}", start_parse_debug_file.elapsed());
+            println!(" completed in {:?}", start_parse_debug_file.elapsed());
             result
         },
         None => None,
     };
 
     // Decompile the storyfile
+    print!("Disassembling the storyfile...");
+    io::stdout().flush().unwrap();
     let start_disassemble = Instant::now();
-    let mut decompiler = if_decompiler::glulx::GlulxState::new(debug_function_data, args.safe_function_overrides, args.unsafe_function_overrides);
+    let mut decompiler = if_decompiler::glulx::GlulxState::new(debug_function_data, args.safe_function_overrides, args.stop_on_string, args.unsafe_function_overrides);
     decompiler.decompile_rom(image.unwrap());
     let duration = start_disassemble.elapsed();
-    println!("Time disassembling the storyfile: {:?}", duration);
+    println!(" completed in {:?}", duration);
 
     // Output the C files
     let mut output = output::GlulxOutput::new(args.disassemble, data_length as u32, name, out_dir, decompiler, workspace_dir);

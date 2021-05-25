@@ -16,6 +16,8 @@ use super::*;
 
 impl GlulxOutput {
     pub fn output_image(&self, data: &[u8]) -> std::io::Result<()> {
+        print!("Outputting image.c...");
+        io::stdout().flush().unwrap();
         let start = Instant::now();
 
         let mut file = self.make_file("image.c")?;
@@ -31,7 +33,7 @@ impl GlulxOutput {
         write!(file, "}};")?;
 
         let duration = start.elapsed();
-        println!("Time outputting image.c: {:?}", duration);
+        println!(" completed in {:?}", duration);
         Ok(())
     }
 }

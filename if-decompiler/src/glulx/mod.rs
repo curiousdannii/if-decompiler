@@ -24,16 +24,18 @@ pub struct GlulxState {
     pub functions: BTreeMap<u32, Function>,
     pub ramstart: u32,
     pub safe_function_overides: Option<Vec<u32>>,
+    pub stop_on_string: bool,
     pub unsafe_function_overides: Option<Vec<u32>>,
 }
 
 impl GlulxState {
-    pub fn new(debug_function_data: Option<BTreeMap<u32, DebugFunctionData>>, safe_function_overides: Option<Vec<u32>>, unsafe_function_overides: Option<Vec<u32>>) -> Self {
+    pub fn new(debug_function_data: Option<BTreeMap<u32, DebugFunctionData>>, safe_function_overides: Option<Vec<u32>>, stop_on_string: bool, unsafe_function_overides: Option<Vec<u32>>) -> Self {
         GlulxState {
             debug_function_data,
             functions: BTreeMap::default(),
             ramstart: 0,
             safe_function_overides,
+            stop_on_string,
             unsafe_function_overides,
         }
     }

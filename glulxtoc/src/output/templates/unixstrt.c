@@ -16,6 +16,7 @@
 */
 glkunix_argumentlist_t glkunix_arguments[] = {
   { "--undo", glkunix_arg_ValueFollows, "Number of undo states to store." },
+  { "", glkunix_arg_ValueFollows, "filename: Ignored" },
   { NULL, glkunix_arg_End, NULL }
 };
 

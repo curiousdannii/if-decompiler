@@ -32,20 +32,21 @@ fi
 cargo run --bin glulxtoc -- $FILE --out-dir=$OUTDIR $DISFLAG $DEBUG $SAFE_FUNCS $STACK $STOP_ON_STRING $UNSAFE_FUNCS
 
 if [ "$REM" ]; then
-    GLKLIB="$TESTDIR/remglk"
+    GLKLIB="remglk"
     REMFLAG="-r"
 else
-    GLKLIB="$TESTDIR/cheapglk"
+    GLKLIB="cheapglk"
+    BINFLAG="-u"
 fi
 
 BUILDDIR="$OUTDIR/$GLKLIB"
 mkdir -p $BUILDDIR
 export CC=clang
-cmake -DGlkLibPath=$GLKLIB -B$BUILDDIR -S$OUTDIR
+cmake -DGlkLibPath=$TESTDIR/$GLKLIB -B$BUILDDIR -S$OUTDIR
 make -C $BUILDDIR -j$(nproc) --no-print-directory
 
 REGTEST="$TESTDIR/regtest.py"
-BIN="$BUILDDIR/$(basename ${FILE%%.*}) -u"
+BIN="$BUILDDIR/$(basename ${FILE%%.*}) $BINFLAG"
 TESTFILE="$FILE.regtest"
 echo "Running testfile $TESTFILE"
 python $REGTEST -i "$BIN" $TESTFILE $REMFLAG -t 10

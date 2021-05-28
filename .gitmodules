@@ -1,6 +1,3 @@
-[submodule "cheapglk"]
-	path = upstream/cheapglk
-	url = https://github.com/erkyrath/cheapglk.git
 [submodule "glulxe"]
 	path = upstream/glulxe
 	url = https://github.com/erkyrath/glulxe.git

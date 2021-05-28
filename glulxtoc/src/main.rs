@@ -79,12 +79,6 @@ fn main() -> Result<(), Box<std::io::Error>> {
 }
 
 fn run(args: Cli) -> Result<(), Box<std::io::Error>> {
-    // Find where we are running from
-    let mut workspace_dir = env::current_exe()?;
-    workspace_dir.pop();
-    workspace_dir.pop();
-    workspace_dir.pop();
-
     // Start processing args
     let mut storyfile_path = env::current_dir()?;
     storyfile_path.push(args.path);
@@ -95,7 +89,7 @@ fn run(args: Cli) -> Result<(), Box<std::io::Error>> {
         None => {
             let mut path = storyfile_path.clone();
             let mut name = path.file_name().unwrap().to_os_string();
-            name.push(".decompiled");
+            name.push(if args.disassemble { ".disassembled" } else { ".decompiled" });
             path.pop();
             path.push(name);
             path
@@ -154,7 +148,7 @@ fn run(args: Cli) -> Result<(), Box<std::io::Error>> {
     println!(" completed in {:?}", duration);
 
     // Output the C files
-    let mut output = output::GlulxOutput::new(args.disassemble, data_length as u32, name, out_dir, decompiler, workspace_dir);
+    let mut output = output::GlulxOutput::new(args.disassemble, data_length as u32, name, out_dir, decompiler);
     output.output(&data)?;
 
     let duration = start.elapsed();

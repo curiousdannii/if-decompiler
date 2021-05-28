@@ -15,6 +15,16 @@ https://github.com/curiousdannii/if-decompiler
 #include "glulxtoc.h"
 #include <math.h>
 
+// From accel.c
+void init_accel(void) {}
+acceleration_func accel_find_func(glui32 index) { return NULL; }
+acceleration_func accel_get_func(glui32 addr) { return NULL; }
+void accel_set_func(glui32 index, glui32 addr) {}
+void accel_set_param(glui32 index, glui32 val) {}
+glui32 accel_get_param_count(void) { return 0; }
+glui32 accel_get_param(glui32 index) { return 0; }
+void accel_iterate_funcs(void (*func)(glui32 index, glui32 addr)) {}
+
 glui32 OP_DIV(glui32 arg0, glui32 arg1) {
     glsi32 dividend = (glsi32) arg0;
     glsi32 divisor = (glsi32) arg1;

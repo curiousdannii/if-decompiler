@@ -33,11 +33,10 @@ pub struct GlulxOutput {
     pub safe_functions: Vec<u32>,
     pub state: GlulxState,
     pub unsafe_functions: Vec<u32>,
-    pub workspace_dir: PathBuf,
 }
 
 impl GlulxOutput {
-    pub fn new(disassemble_mode: bool, file_length: u32, name: String, out_dir: PathBuf, state: GlulxState, workspace_dir: PathBuf) -> GlulxOutput {
+    pub fn new(disassemble_mode: bool, file_length: u32, name: String, out_dir: PathBuf, state: GlulxState) -> GlulxOutput {
         let mut safe_functions = Vec::new();
         let mut unsafe_functions = Vec::new();
         for (&addr, function) in &state.functions {
@@ -57,7 +56,6 @@ impl GlulxOutput {
             safe_functions,
             state,
             unsafe_functions,
-            workspace_dir,
         }
     }
 

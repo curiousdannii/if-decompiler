@@ -2,10 +2,13 @@
 
 set -e
 
+TESTDIR="$(dirname "$0")"
+
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -d|--disassemble) DISASSEMBLE=1; ;;
         -f|--file) FILE="$2"; shift ;;
+        -r|--rem) REM=1; ;;
         -s|--safe-funcs) SAFE_FUNCS="--safe-function-overrides=$2"; shift ;;
         --stack) STACK="--stack-size=$2"; shift ;;
         --stop-on-string) STOP_ON_STRING="--stop-on-string"; ;;
@@ -28,14 +31,21 @@ fi
 
 cargo run --bin glulxtoc -- $FILE --out-dir=$OUTDIR $DISFLAG $DEBUG $SAFE_FUNCS $STACK $STOP_ON_STRING $UNSAFE_FUNCS
 
-CHEAPGLK="$OUTDIR/cheapglk"
-mkdir -p $CHEAPGLK
-export CC=clang
-cmake -B$CHEAPGLK -S$OUTDIR
-make -C $CHEAPGLK -j$(nproc) --no-print-directory
+if [ "$REM" ]; then
+    GLKLIB="$TESTDIR/remglk"
+    REMFLAG="-r"
+else
+    GLKLIB="$TESTDIR/cheapglk"
+fi
 
-REGTEST="$(dirname "$0")/regtest.py"
-BIN="$CHEAPGLK/$(basename ${FILE%%.*}) -u"
+BUILDDIR="$OUTDIR/$GLKLIB"
+mkdir -p $BUILDDIR
+export CC=clang
+cmake -DGlkLibPath=$GLKLIB -B$BUILDDIR -S$OUTDIR
+make -C $BUILDDIR -j$(nproc) --no-print-directory
+
+REGTEST="$TESTDIR/regtest.py"
+BIN="$BUILDDIR/$(basename ${FILE%%.*}) -u"
 TESTFILE="$FILE.regtest"
 echo "Running testfile $TESTFILE"
-python $REGTEST -i "$BIN" $TESTFILE -t 10
+python $REGTEST -i "$BIN" $TESTFILE $REMFLAG -t 10

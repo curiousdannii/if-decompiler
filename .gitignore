@@ -1,4 +1,5 @@
 target
+tests/*glk
 tests/regtest.py
 tests/*.decompiled
 tests/*.disassembled

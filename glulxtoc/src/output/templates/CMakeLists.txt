@@ -10,23 +10,17 @@ function(add_sources target dir)
     target_include_directories(${target} PRIVATE ${dir})
 endfunction()
 
-# Cheapglk library
-add_library(cheapglk STATIC)
-add_sources(cheapglk "WORKSPACE/upstream/cheapglk/"
-    SRCS cgblorb.c cgdate.c cgfref.c cggestal.c cgmisc.c cgschan.c cgstream.c
-    cgstyle.c cgunicod.c cgwindow.c gi_blorb.c gi_debug.c gi_dispa.c main.c)
-target_compile_options(cheapglk PRIVATE -g -Wall)
-target_include_directories(cheapglk PUBLIC WORKSPACE/upstream/cheapglk/)
-
-# Turn Glulxe into a library too
-add_library(glulxe STATIC)
-target_link_libraries(glulxe cheapglk m)
-add_sources(glulxe "WORKSPACE/upstream/glulxe/"
-    SRCS accel.c files.c float.c funcs.c gestalt.c glkop.c heap.c main.c
-    operand.c osdepend.c profile.c search.c serial.c string.c vm.c)
-target_compile_definitions(glulxe PRIVATE OS_UNIX FLOAT_COMPILE_SAFER_POWF)
-target_compile_options(glulxe PRIVATE -Wall -Wmissing-prototypes -Wstrict-prototypes -Wno-unused)
-target_include_directories(glulxe PUBLIC WORKSPACE/upstream/glulxe/)
+# Find the requested library
+set(GlkLibPath "glk" CACHE PATH "Glk Library Path")
+set(GlkLibName "" CACHE STRING "Glk Library Name (without lib- or -.a)")
+if (GlkLibName STREQUAL "")
+    get_filename_component(GlkLibNameReal ${GlkLibPath} NAME)
+else ()
+    set(GlkLibNameReal ${GlkLibName} STRING)
+endif()
+add_library(glk STATIC IMPORTED)
+set_target_properties(glk PROPERTIES IMPORTED_LOCATION "${GlkLibPath}/lib${GlkLibNameReal}.a")
+target_include_directories(glk INTERFACE ${GlkLibPath})
 
 # Prepare the image data as a library
 add_library(image STATIC image.o)
@@ -37,14 +31,19 @@ add_custom_command(OUTPUT image.o
 set_source_files_properties(image.o PROPERTIES EXTERNAL_OBJECT true GENERATED true)
 
 # And now our project
-add_executable(NAME)
-target_link_libraries(NAME cheapglk glulxe image)
-add_sources(NAME "OUTDIR/"
+add_executable(EXENAME)
+target_link_libraries(EXENAME glk image m)
+add_sources(EXENAME "glulxe/" SRCS GLULXE_FILES)
+target_include_directories(EXENAME PRIVATE glulxe/)
+add_sources(EXENAME "./"
     SRCS functions_safe.c functions_unsafe.c runtime.c unixstrt.c)
-target_compile_options(NAME PRIVATE -Wall -Wmissing-prototypes
+target_compile_definitions(EXENAME PRIVATE OS_UNIX FLOAT_COMPILE_SAFER_POWF)
+target_compile_options(EXENAME PRIVATE -Wall -Wmissing-prototypes
     -Wstrict-prototypes -Wno-overflow -Wno-unused)
 if (CMAKE_C_COMPILER_ID MATCHES "Clang")
-    target_compile_options(NAME PRIVATE
+    target_compile_options(EXENAME PRIVATE
         -fbracket-depth=5000
-        -Wno-constant-conversion -Wno-integer-overflow -Wconditional-uninitialized)
+        -Wno-constant-conversion -Wno-integer-overflow)
+    set_source_files_properties(functions_safe.c functions_unsafe.c
+        PROPERTIES COMPILE_OPTIONS "-Wconditional-uninitialized")
 endif()

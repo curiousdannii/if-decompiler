@@ -68,7 +68,7 @@ fn revisemulti() {
                         branches: branch_to(21395, MergedBranch),
                         next: Some(Box::new(end_node(21395, Some(branch_to(21329, LoopContinue(loop21329id)))))),
                     })),
-                    basic_handled(21404, end_node(21404, Some(branch_to(21412, LoopBreak(loop21251id))))),
+                    basic_handled(21404, end_node(21404, Some(branch_to(21412, LoopBreakIntoMulti(loop21251id))))),
                 ],
             }))),
             branches: FnvHashMap::default(),
@@ -150,17 +150,21 @@ fn revisemulti() {
                         immediate: Some(Box::new(Multiple(MultipleBlock {
                             handled: vec![
                                 basic_handled(21317, end_node(21317, Some(FnvHashMap::from_iter(vec![
-                                    (21322, MergedBranch),
-                                    (21412, LoopBreak(loop21251id)),
+                                    (21322, MergedBranchIntoMulti),
+                                    (21412, LoopBreakIntoMulti(loop21251id)),
                                 ])))),
                             ],
                         }))),
-                        branches: branch_to(21322, MergedBranch),
-                        next: Some(Box::new(Simple(SimpleBlock {
-                            label: 21322,
-                            immediate: Some(loop21329),
-                            branches: FnvHashMap::default(),
-                            next: None,
+                        branches: branch_to(21322, MergedBranchIntoMulti),
+                        next: Some(Box::new(Multiple(MultipleBlock {
+                            handled: vec![
+                                basic_handled(21322, Simple(SimpleBlock {
+                                    label: 21322,
+                                    immediate: Some(loop21329),
+                                    branches: FnvHashMap::default(),
+                                    next: None,
+                                })),
+                            ],
                         }))),
                     })),
                 ],
@@ -211,22 +215,26 @@ fn revisemulti() {
                                         })),
                                     ],
                                 }))),
-                                branches: branch_to(21412, MergedBranch),
+                                branches: branch_to(21412, MergedBranchIntoMulti),
                                 next: None,
                             })),
                         ],
                     }))),
-                    branches: branch_to(21412, MergedBranch),
-                    next: Some(Box::new(Simple(SimpleBlock {
-                        label: 21412,
-                        immediate: Some(Box::new(Multiple(MultipleBlock {
-                            handled: vec![
-                                basic_handled(21424, end_node(21424, None)),
-                                basic_handled(21427, end_node(21427, None)),
-                            ],
-                        }))),
-                        branches: FnvHashMap::default(),
-                        next: None,
+                    branches: branch_to(21412, MergedBranchIntoMulti),
+                    next: Some(Box::new(Multiple(MultipleBlock {
+                        handled: vec![
+                            basic_handled(21412, Simple(SimpleBlock {
+                                label: 21412,
+                                immediate: Some(Box::new(Multiple(MultipleBlock {
+                                    handled: vec![
+                                        basic_handled(21424, end_node(21424, None)),
+                                        basic_handled(21427, end_node(21427, None)),
+                                    ],
+                                }))),
+                                branches: FnvHashMap::default(),
+                                next: None,
+                            })),
+                        ],
                     }))),
                 })),
             ],
@@ -467,7 +475,7 @@ fn scorematchl() {
                                             label: 21676,
                                             immediate: Some(Box::new(Multiple(MultipleBlock {
                                                 handled: vec![
-                                                    basic_handled(21682, end_node(21682, Some(branch_to(21860, MergedBranchIntoMulti)))),
+                                                    basic_handled(21682, end_node(21682, Some(branch_to(21860, MergedBranch)))),
                                                     basic_handled(21695, Simple(SimpleBlock {
                                                         label: 21695,
                                                         immediate: Some(Box::new(Multiple(MultipleBlock {
@@ -518,11 +526,25 @@ fn scorematchl() {
                                                                         label: 21795,
                                                                         immediate: Some(Box::new(Multiple(MultipleBlock {
                                                                             handled: vec![
-                                                                                basic_handled(21802, end_node(21802, Some(branch_to(21808, MergedBranchIntoMulti)))),
+                                                                                basic_handled(21802, end_node(21802, Some(branch_to(21808, MergedBranch)))),
                                                                             ],
                                                                         }))),
-                                                                        branches: branch_to(21808, MergedBranchIntoMulti),
-                                                                        next: None,
+                                                                        branches: branch_to(21808, MergedBranch),
+                                                                        next: Some(Box::new(Simple(SimpleBlock {
+                                                                            label: 21808,
+                                                                            immediate: Some(Box::new(Simple(SimpleBlock {
+                                                                                label: 21819,
+                                                                                immediate: Some(Box::new(Multiple(MultipleBlock {
+                                                                                    handled: vec![
+                                                                                        basic_handled(21834, end_node(21834, Some(branch_to(21840, MergedBranch)))),
+                                                                                    ],
+                                                                                }))),
+                                                                                branches: branch_to(21840, MergedBranch),
+                                                                                next: Some(Box::new(end_node(21840, Some(branch_to(21860, MergedBranch))))),
+                                                                            }))),
+                                                                            branches: FnvHashMap::default(),
+                                                                            next: None,
+                                                                        }))),
                                                                     }))),
                                                                 }))),
                                                                 branches: FnvHashMap::default(),
@@ -533,26 +555,7 @@ fn scorematchl() {
                                                 ],
                                             }))),
                                             branches: FnvHashMap::default(),
-                                            next: Some(Box::new(Multiple(MultipleBlock {
-                                                handled: vec![
-                                                    basic_handled_without_break(21808, Simple(SimpleBlock {
-                                                        label: 21808,
-                                                        immediate: Some(Box::new(Simple(SimpleBlock {
-                                                            label: 21819,
-                                                            immediate: Some(Box::new(Multiple(MultipleBlock {
-                                                                handled: vec![
-                                                                    basic_handled(21834, end_node(21834, Some(branch_to(21840, MergedBranch)))),
-                                                                ],
-                                                            }))),
-                                                            branches: branch_to(21840, MergedBranch),
-                                                            next: Some(Box::new(end_node(21840, Some(branch_to(21860, MergedBranchIntoMulti))))),
-                                                        }))),
-                                                        branches: FnvHashMap::default(),
-                                                        next: None,
-                                                    })),
-                                                    basic_handled(21860, end_node(21860, Some(branch_to(21542, LoopContinue(loop21542id))))),
-                                                ],
-                                            }))),
+                                            next: Some(Box::new(end_node(21860, Some(branch_to(21542, LoopContinue(loop21542id)))))),
                                         }))),
                                     }))),
                                 }))),

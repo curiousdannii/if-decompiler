@@ -17,6 +17,7 @@ use ShapedBlock::*;
 
 mod glulxercise;
 mod inform6lib;
+mod inform7;
 
 fn basic_handled<T: RelooperLabel>(label: T, inner: ShapedBlock<T>) -> HandledBlock<T> {
     HandledBlock {

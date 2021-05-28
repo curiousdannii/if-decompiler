@@ -27,7 +27,6 @@ mod image;
 pub struct GlulxOutput {
     pub disassemble_mode: bool,
     pub file_length: u32,
-    pub have_warned_about_dynamic_branches: bool,
     pub name: String,
     pub out_dir: PathBuf,
     pub ramstart: u32,
@@ -52,7 +51,6 @@ impl GlulxOutput {
         GlulxOutput {
             disassemble_mode,
             file_length,
-            have_warned_about_dynamic_branches: false,
             name,
             out_dir,
             ramstart: state.ramstart,

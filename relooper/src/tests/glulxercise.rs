@@ -42,7 +42,11 @@ fn float() {
                         ],
                     }))),
                     branches: branch_to(65023, MergedBranchIntoMulti),
-                    next: None,
+                    next: Some(Box::new(Multiple(MultipleBlock {
+                        handled: vec![
+                            basic_handled(65023, end_node(65023, None)),
+                        ],
+                    }))),
                 })),
             ],
         }))),
@@ -50,7 +54,6 @@ fn float() {
         next: Some(Box::new(Multiple(MultipleBlock {
             handled: vec![
                 basic_handled(65011, end_node(65011, None)),
-                basic_handled(65023, end_node(65023, None)),
             ],
         }))),
     })));
@@ -97,7 +100,7 @@ fn looksub() {
                                                     label: 3750,
                                                     immediate: Some(Box::new(Multiple(MultipleBlock {
                                                         handled: vec![
-                                                            basic_handled(3758, end_node(3758, Some(branch_to(3798, MergedBranch)))),
+                                                            basic_handled(3758, end_node(3758, Some(branch_to(3798, MergedBranchIntoMulti)))),
                                                         ],
                                                     }))),
                                                     branches: branch_to(3761, MergedBranchIntoMulti),
@@ -122,32 +125,36 @@ fn looksub() {
                                             ],
                                         }))),
                                         branches: branch_to(3771, MergedBranch),
-                                        next: Some(Box::new(end_node(3771, Some(branch_to(3798, MergedBranch))))),
+                                        next: Some(Box::new(end_node(3771, Some(branch_to(3798, MergedBranchIntoMulti))))),
                                     })),
                                 ],
                             }))),
                         })),
                     ],
                 }))),
-                branches: branch_to(3798, MergedBranch),
-                next: Some(Box::new(Simple(SimpleBlock {
-                    label: 3798,
-                    immediate: Some(Box::new(Multiple(MultipleBlock {
-                        handled: vec![
-                            basic_handled(3808, Simple(SimpleBlock {
-                                label: 3808,
-                                immediate: Some(Box::new(Multiple(MultipleBlock {
-                                    handled: vec![
-                                        basic_handled(3818, end_node(3818, Some(branch_to(3833, MergedBranch)))),
-                                    ],
-                                }))),
-                                branches: branch_to(3833, MergedBranch),
-                                next: Some(Box::new(end_node(3833, None))),
-                            })),
-                        ],
-                    }))),
-                    branches: branch_to(3708, LoopContinue(0)),
-                    next: None,
+                branches: branch_to(3798, MergedBranchIntoMulti),
+                next: Some(Box::new(Multiple(MultipleBlock {
+                    handled: vec![
+                        basic_handled(3798, Simple(SimpleBlock {
+                            label: 3798,
+                            immediate: Some(Box::new(Multiple(MultipleBlock {
+                                handled: vec![
+                                    basic_handled(3808, Simple(SimpleBlock {
+                                        label: 3808,
+                                        immediate: Some(Box::new(Multiple(MultipleBlock {
+                                            handled: vec![
+                                                basic_handled(3818, end_node(3818, Some(branch_to(3833, MergedBranch)))),
+                                            ],
+                                        }))),
+                                        branches: branch_to(3833, MergedBranch),
+                                        next: Some(Box::new(end_node(3833, None))),
+                                    })),
+                                ],
+                            }))),
+                            branches: branch_to(3708, LoopContinue(0)),
+                            next: None,
+                        })),
+                    ],
                 }))),
             })),
             next: None,
@@ -373,7 +380,7 @@ fn tokenise() {
         label: 786,
         immediate: Some(Box::new(Multiple(MultipleBlock {
             handled: vec![
-                basic_handled(792, end_node(792, Some(branch_to(959, LoopBreak(loop756id))))),
+                basic_handled(792, end_node(792, Some(branch_to(959, LoopBreakIntoMulti(loop756id))))),
                 basic_handled(796, Simple(SimpleBlock {
                     label: 796,
                     immediate: Some(Box::new(Multiple(MultipleBlock {
@@ -407,7 +414,7 @@ fn tokenise() {
                                 label: 892,
                                 immediate: Some(Box::new(Multiple(MultipleBlock {
                                     handled: vec![
-                                        basic_handled(952, end_node(952, Some(branch_to(959, LoopBreak(loop756id))))),
+                                        basic_handled(952, end_node(952, Some(branch_to(959, LoopBreakIntoMulti(loop756id))))),
                                         basic_handled(955, end_node(955, Some(branch_to(749, LoopContinue(loop749id))))),
                                     ],
                                 }))),
@@ -459,12 +466,16 @@ fn tokenise() {
                         basic_handled(756, *blocks756),
                     ],
                 }))),
-                branches: branch_to(959, MergedBranch),
-                next: Some(Box::new(Simple(SimpleBlock {
-                    label: 959,
-                    immediate: Some(loop990),
-                    branches: FnvHashMap::default(),
-                    next: None,
+                branches: branch_to(959, MergedBranchIntoMulti),
+                next: Some(Box::new(Multiple(MultipleBlock {
+                    handled: vec![
+                        basic_handled(959, Simple(SimpleBlock {
+                            label: 959,
+                            immediate: Some(loop990),
+                            branches: FnvHashMap::default(),
+                            next: None,
+                        })),
+                    ],
                 }))),
             })),
             next: None

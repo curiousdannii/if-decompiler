@@ -41,7 +41,7 @@ pub fn reloop<L: RelooperLabel>(blocks: Vec<(L, Vec<L>)>, first_label: L) -> Box
     let mut relooper = Relooper::new(blocks, first_label);
     relooper.process_loops();
     relooper.process_rejoined_branches();
-    relooper.output(vec![relooper.graph_root]).unwrap()
+    relooper.output(vec![relooper.graph_root], false).unwrap()
 }
 
 // And returns a ShapedBlock tree
@@ -109,7 +109,7 @@ enum Edge<L> {
     // Edges that form the acyclic CFG
     Forward,
     ForwardMulti(L),
-    Next,
+    Next(bool), // Whether or not the next block must be a Multiple
     // Edges that will be filtered out when traversing the graph
     ForwardMultiViaNext(L),
     LoopBreak(LoopId),
@@ -124,7 +124,7 @@ enum Edge<L> {
 fn filter_edges<L>(edge: petgraph::graph::EdgeReference<Edge<L>>) -> bool {
     use Edge::*;
     match edge.weight() {
-        Forward | ForwardMulti(_) | Next => true,
+        Forward | ForwardMulti(_) | Next(_) => true,
         _ => false,
     }
 }
@@ -132,7 +132,7 @@ fn filter_edges<L>(edge: petgraph::graph::EdgeReference<Edge<L>>) -> bool {
 fn filter_edges_including_processed<L>(edge: petgraph::graph::EdgeReference<Edge<L>>) -> bool {
     use Edge::*;
     match edge.weight() {
-        Forward | ForwardMulti(_) | Next | ForwardMultiViaNext(_)
+        Forward | ForwardMulti(_) | Next(_) | ForwardMultiViaNext(_)
             | LoopBreak(_) | LoopBreakIntoMulti(_) | MergedBranch
             | MergedBranchIntoMulti => true,
         _ => false,
@@ -269,12 +269,12 @@ impl<L: RelooperLabel> Relooper<L> {
                                 // Add a next edge to the dominator if there isn't one already
                                 let dominator = dominators.immediate_dominator(target).unwrap();
                                 if !self.graph.contains_edge(dominator, target) {
-                                    self.graph.add_edge(dominator, target, Edge::Next);
+                                    self.graph.add_edge(dominator, target, Edge::Next(false));
                                 }
                                 // Check if the loop already has a next to something else
                                 let mut into_multi = false;
                                 for edge in self.graph.edges(dominator) {
-                                    if let Edge::Next = edge.weight() {
+                                    if let Edge::Next(_) = edge.weight() {
                                         if edge.target() != target {
                                             into_multi = true;
                                             break;
@@ -317,7 +317,7 @@ impl<L: RelooperLabel> Relooper<L> {
             let mut parent_nodes = FnvHashSet::default();
             for edge in self.graph.edges_directed(node, Incoming) {
                 match edge.weight() {
-                    Edge::Forward | Edge::ForwardMulti(_) | Edge::LoopBreak(_) | Edge::LoopBreakIntoMulti(_) | Edge::Next => {
+                    Edge::Forward | Edge::ForwardMulti(_) | Edge::LoopBreak(_) | Edge::LoopBreakIntoMulti(_) | Edge::Next(_) => {
                         parent_nodes.insert(edge.source());
                     },
                     _ => {},
@@ -355,7 +355,7 @@ impl<L: RelooperLabel> Relooper<L> {
             // Handle pre-existing next nodes from loop breaks
             let mut dominator_edges = self.graph.neighbors(dominator).detach();
             while let Some((edge_id, target)) = dominator_edges.next(&self.graph) {
-                if let Edge::Next = self.graph[edge_id] {
+                if let Edge::Next(_) = self.graph[edge_id] {
                     if !dominated_nodes.contains(&target) {
                         panic!("Loop break to a node that is not one of this dominator's branch merges");
                     }
@@ -376,7 +376,7 @@ impl<L: RelooperLabel> Relooper<L> {
             if !into_multi || self.can_merged_nodes_use_multiple(&dominated_nodes) {
                 for &node in dominated_nodes {
                     // Add the next node
-                    self.graph.add_edge(dominator, node, Edge::Next);
+                    self.graph.add_edge(dominator, node, Edge::Next(false));
                     // Patch the exisiting incoming edges
                     let mut incoming_edges = self.graph.neighbors_directed(node, Incoming).detach();
                     while let Some((edge, _)) = incoming_edges.next(&self.graph) {
@@ -398,54 +398,83 @@ impl<L: RelooperLabel> Relooper<L> {
             self.make_loop(&loop_headers, &loop_parents, loop_parents_test);
         }
 
-        // Find the common dominator of a list of nodes
-        let common_dominator = |first_node: NodeIndex, other_nodes: &Vec<NodeIndex>| -> NodeIndex {
-            'first_node_loop: for dominator in dominators.strict_dominators(first_node).unwrap() {
-                'other_node_loop: for &other_node in other_nodes {
-                    for other_dominator in dominators.strict_dominators(other_node).unwrap() {
-                        if other_dominator == dominator {
-                            continue 'other_node_loop;
-                        }
-                    }
-                    // No matching dominator
-                    continue 'first_node_loop;
-                }
-                // All nodes have dominator as one of their dominators!
-                return dominator;
-            }
-            panic!("Could not find common dominator");
-        };
-
-        // Look for MergedBranch edges which don't go to a Simple node, and fix them
+        // Look for MergedBranch|LoopBreak edges which don't go to the right place
         for &node in sorted_nodes.iter() {
             let mut edges = self.graph.neighbors(node).detach();
             while let Some((edge, target)) = edges.next(&self.graph) {
-                if let Edge::MergedBranch = self.graph[edge] {
-                    let mut next_nodes = self.find_parent_with_bad_next(node, target, &dominators);
-                    if next_nodes.len() > 1 || !next_nodes.contains(&target) {
-                        // Find the common dominator
-                        let new_next_node = common_dominator(target, &next_nodes);
-                        // Now fix up all the affected nodes
-                        next_nodes.insert(0, target);
-                        for node in next_nodes {
-                            // Remove the original Next edges to the target
-                            let mut incoming_edges = self.graph.neighbors_directed(node, Incoming).detach();
-                            while let Some((edge, _)) = incoming_edges.next(&self.graph) {
-                                if let Edge::Next = self.graph[edge] {
-                                    self.graph[edge] = Edge::Removed;
+                if let Edge::MergedBranch | Edge::LoopBreak(_) = self.graph[edge] {
+                    // Go through the node's dominators (including itself)
+                    let mut change_to_multi = false;
+                    let mut processed_nodes = Vec::new();
+                    let node_dominators = dominators.dominators(node).unwrap();
+                    'dominator_loop: for dominator in node_dominators {
+                        // If we reach the root node then something has gone wrong
+                        if dominator == self.graph_root {
+                            panic!("No dominator of {:?} found with Next", target);
+                        }
+                        processed_nodes.push(dominator);
+
+                        // Get all the next nodes of this dominator
+                        let mut next_nodes = Vec::new();
+                        let mut dominator_edges = self.graph.neighbors(dominator).detach();
+                        while let Some((edge, target)) = dominator_edges.next(&self.graph) {
+                            if let Edge::Next(_) = self.graph[edge] {
+                                next_nodes.push((edge, target));
+                            }
+                        }
+
+                        // No next nodes is fine
+                        if next_nodes.len() == 0 {
+                            continue 'dominator_loop;
+                        }
+                        // If there is one next node...
+                        if next_nodes.len() == 1 {
+                            let next_target = next_nodes[0].1;
+                            // And it's the target, great!
+                            if next_target == target {
+                                break 'dominator_loop;
+                            }
+                            // If it's a node we've already processed, that's okay too
+                            else if processed_nodes.contains(&next_target) {
+                                continue 'dominator_loop;
+                            }
+                            // If it isn't, then force that next to be a Multiple
+                            else {
+                                change_to_multi = true;
+                                // Patch the incoming edges to the node
+                                let mut incoming_edges = self.graph.neighbors_directed(next_target, Incoming).detach();
+                                while let Some((edge, _)) = incoming_edges.next(&self.graph) {
+                                    match self.graph[edge] {
+                                        Edge::MergedBranch => { self.graph[edge] = Edge::MergedBranchIntoMulti; },
+                                        Edge::LoopBreak(loop_id) => { self.graph[edge] = Edge::LoopBreakIntoMulti(loop_id); },
+                                        Edge::Next(_) => { self.graph[edge] = Edge::Next(true); },
+                                        _ => {},
+                                    };
                                 }
                             }
-                            self.graph.update_edge(new_next_node, node, Edge::Next);
-                            // Replace the incoming edges
-                            let mut incoming_edges = self.graph.neighbors_directed(node, Incoming).detach();
-                            while let Some((edge, _)) = incoming_edges.next(&self.graph) {
-                                match self.graph[edge] {
-                                    Edge::MergedBranch => { self.graph[edge] = Edge::MergedBranchIntoMulti },
-                                    Edge::LoopBreak(loop_id) => { self.graph[edge] = Edge::LoopBreakIntoMulti(loop_id) },
-                                    Edge::LoopContinue(loop_id) => { self.graph[edge] = Edge::LoopContinueIntoMulti(loop_id) },
-                                    _ => {},
+                        }
+                        // If there are 2+ next nodes
+                        if next_nodes.len() > 1 {
+                            // And the target is one of them, great!
+                            for (_, edge_target) in next_nodes {
+                                if edge_target == target {
+                                    break 'dominator_loop;
                                 }
                             }
+                            change_to_multi = true;
+                        }
+                    }
+
+                    // Patch the edges to Target if necessary
+                    if change_to_multi {
+                        let mut incoming_edges = self.graph.neighbors_directed(target, Incoming).detach();
+                        while let Some((edge, _)) = incoming_edges.next(&self.graph) {
+                            match self.graph[edge] {
+                                Edge::MergedBranch => { self.graph[edge] = Edge::MergedBranchIntoMulti; },
+                                Edge::LoopBreak(loop_id) => { self.graph[edge] = Edge::LoopBreakIntoMulti(loop_id); },
+                                Edge::Next(_) => { self.graph[edge] = Edge::Next(true); },
+                                _ => {},
+                            };
                         }
                     }
                 }
@@ -454,18 +483,19 @@ impl<L: RelooperLabel> Relooper<L> {
     }
 
     // Output the graph as blocks
-    fn output(&self, entries: Vec<NodeIndex>) -> Option<Box<ShapedBlock<L>>> {
+    fn output(&self, entries: Vec<NodeIndex>, force_multi: bool) -> Option<Box<ShapedBlock<L>>> {
         if entries.len() == 0 {
             return None
         }
 
         // If we have one entry, then return the appropriate block
-        if entries.len() == 1 {
+        if !force_multi && entries.len() == 1 {
             let node_id = entries[0];
             let node = &self.graph[node_id];
             let mut immediate_entries = FnvHashSet::default();
             let mut next_entries = FnvHashSet::default();
             let mut outgoing_branches = FnvHashMap::default();
+            let mut next_multi = false;
             for edge in self.graph.edges(node_id) {
                 if let Edge::Removed = edge.weight() {
                     continue;
@@ -474,7 +504,7 @@ impl<L: RelooperLabel> Relooper<L> {
                 let mut add_branch = |target, branch| outgoing_branches.insert(self.get_basic_node_label(target), branch);
                 match edge.weight() {
                     Edge::Forward | Edge::ForwardMulti(_) => { immediate_entries.insert(target); },
-                    Edge::Next => { next_entries.insert(target); },
+                    Edge::Next(is_multi) => { next_entries.insert(target); next_multi |= is_multi; },
                     Edge::ForwardMultiViaNext(label) => { outgoing_branches.insert(*label, BranchMode::MergedBranchIntoMulti); },
                     Edge::LoopBreak(loop_id) => { add_branch(target, BranchMode::LoopBreak(*loop_id)); },
                     Edge::LoopBreakIntoMulti(loop_id) => { add_branch(target, BranchMode::LoopBreakIntoMulti(*loop_id)); },
@@ -482,55 +512,35 @@ impl<L: RelooperLabel> Relooper<L> {
                     Edge::LoopContinueIntoMulti(loop_id) => { add_branch(target, BranchMode::LoopContinueIntoMulti(*loop_id)); },
                     Edge::MergedBranch => { add_branch(target, BranchMode::MergedBranch); },
                     Edge::MergedBranchIntoMulti => { add_branch(target, BranchMode::MergedBranchIntoMulti); },
-                    _ => {},
+                    Edge::Removed => {},
                 };
             }
             // Dedup the ForwardMulti edges
             let immediate_entries = Vec::from_iter(immediate_entries);
             let next_entries = Vec::from_iter(next_entries);
+            let is_multi = match node {
+                Node::Multiple(_) | Node::LoopMulti(_) => true,
+                _ => false,
+            };
 
             return match node {
                 Node::Root => {
                     assert_eq!(next_entries.len(), 0, "Root node should have no next entries");
-                    self.output(immediate_entries)
+                    self.output(immediate_entries, false)
                 },
-                Node::Basic(label) => {
+                Node::Basic(label) | Node::Multiple(label) => {
                     Some(Box::new(ShapedBlock::Simple(SimpleBlock {
                         label: *label,
-                        immediate: self.output(immediate_entries),
-                        next: self.output(next_entries),
+                        immediate: self.output(immediate_entries, is_multi),
+                        next: self.output(next_entries, next_multi),
                         branches: outgoing_branches,
                     })))
                 },
-                // This node originally branched, even though there may not be multiple immediate entries now
-                Node::Multiple(label) => {
-                    Some(Box::new(ShapedBlock::Simple(SimpleBlock {
-                        label: *label,
-                        // Return a MultipleBlock even if there's now only one immediate entry
-                        immediate: if immediate_entries.len() > 0 {
-                            Some(Box::new(ShapedBlock::Multiple(MultipleBlock {
-                                handled: self.output_multiple_handled(immediate_entries),
-                            })))
-                        } else { None },
-                        next: self.output(next_entries),
-                        branches: outgoing_branches,
-                    })))
-                },
-                Node::Loop(loop_id) => {
+                Node::Loop(loop_id) | Node::LoopMulti(loop_id) => {
                     Some(Box::new(ShapedBlock::Loop(LoopBlock {
                         loop_id: *loop_id,
-                        inner: self.output(immediate_entries).unwrap(),
-                        next: self.output(next_entries),
-                    })))
-                },
-                Node::LoopMulti(loop_id) => {
-                    let handled = self.output_multiple_handled(immediate_entries);
-                    Some(Box::new(ShapedBlock::Loop(LoopBlock {
-                        loop_id: *loop_id,
-                        inner: Box::new(ShapedBlock::Multiple(MultipleBlock {
-                            handled,
-                        })),
-                        next: self.output(next_entries),
+                        inner: self.output(immediate_entries, is_multi).unwrap(),
+                        next: self.output(next_entries, next_multi),
                     })))
                 },
             }
@@ -560,31 +570,6 @@ impl<L: RelooperLabel> Relooper<L> {
             }
         }
         return true;
-    }
-
-    // Find a node with Next edges, could be the node itself, or one of its ancestors
-    fn find_parent_with_bad_next (&self, node: NodeIndex, target: NodeIndex, dominators: &algo::dominators::Dominators<NodeIndex>) -> Vec<NodeIndex> {
-        'dom_loop: for dominator in dominators.dominators(node).unwrap() {
-            let mut next_nodes = Vec::new();
-            for edge in self.graph.edges(dominator) {
-                if let Edge::Next = edge.weight() {
-                    if edge.target() == node {
-                        continue 'dom_loop;
-                    }
-                    next_nodes.push(edge.target());
-                }
-            }
-            next_nodes.sort();
-            next_nodes.dedup();
-            // It's actually okay to skip over a Next that goes to a Multiple
-            if next_nodes.len() > 1 && !next_nodes.contains(&target) {
-                continue;
-            }
-            if next_nodes.len() > 0 {
-                return next_nodes;
-            }
-        }
-        panic!("No dominator of {:?} found with Next", node);
     }
 
     fn get_basic_node_label(&self, id: NodeIndex) -> L {
@@ -635,7 +620,7 @@ impl<L: RelooperLabel> Relooper<L> {
                         },
                         Edge::ForwardMulti(_) => unreachable!("A loop node should never be a loop header of a second loop"),
                         // Next edges get removed
-                        Edge::Next => {
+                        Edge::Next(_) => {
                             self.graph[edge_id] = Edge::Removed;
                         },
                         // Other edges are left as they are
@@ -658,7 +643,7 @@ impl<L: RelooperLabel> Relooper<L> {
                     for edge in self.graph.edges(node) {
                         match edge.weight() {
                             // Ignore Next and Removed edges, but include everything else
-                            Edge::Next | Edge::Removed => {},
+                            Edge::Next(_) | Edge::Removed => {},
                             _ => { neighbors.insert(edge.target()); },
                         };
                     }
@@ -685,7 +670,7 @@ impl<L: RelooperLabel> Relooper<L> {
                     }
                     else {
                         match self.graph[edge] {
-                            Edge::Forward | Edge::ForwardMulti(_) | Edge::Next => {
+                            Edge::Forward | Edge::ForwardMulti(_) | Edge::Next(_) => {
                                 // If the target node is dominated by the loop node then add it to the stack
                                 let target_dominators = dominators.strict_dominators(target).unwrap();
                                 for dom in target_dominators {
@@ -712,7 +697,7 @@ impl<L: RelooperLabel> Relooper<L> {
                     }
                 };
             }
-            self.graph.add_edge(dominator, loop_node, Edge::Next);
+            self.graph.add_edge(dominator, loop_node, Edge::Next(false));
         }
 
         (loop_node, loop_id)
@@ -743,7 +728,7 @@ impl<L: RelooperLabel> Relooper<L> {
                     },
                     _ => unimplemented!(),
                 },
-                inner: *self.output(vec![entry]).unwrap(),
+                inner: *self.output(vec![entry], false).unwrap(),
                 // false if this entry can reach the next, otherwise true
                 break_after: next_entry.map_or(true, |next| !algo::has_path_connecting(&filtered_graph, entry, *next, Some(&mut space))),
             });

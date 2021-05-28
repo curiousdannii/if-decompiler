@@ -85,7 +85,7 @@ impl GlulxOutput {
             OP_GETSTRINGTBL => String::from("stream_get_table()"),
             OP_SETSTRINGTBL => runtime("stream_set_table", &args),
             // OP_GETIOSYS
-            OP_SETIOSYS => runtime("stream_set_iosys", &args),
+            OP_SETIOSYS => format!("iosys_mode = {}; stream_set_iosys(iosys_mode, {})", op_a, op_b),
             OP_GLK => format!("(temp0 = {}, temp1 = {}, perform_glk(temp0, temp1, pop_arguments(temp1, 0)))", op_a, op_b),
             OP_RANDOM => runtime("OP_RANDOM", &args),
             OP_SETRANDOM => runtime("glulx_setrandom", &args),

@@ -35,6 +35,7 @@ extern char _binary_image_data_start[];
 #define GLULX_IMAGE _binary_image_data_start
 
 // runtime.c
+extern int iosys_mode;
 extern glui32 OP_DIV(glui32 arg1, glui32 arg2);
 extern glui32 OP_MOD(glui32 arg1, glui32 arg2);
 extern glui32 OP_SHIFTL(glui32 arg1, glui32 arg2);

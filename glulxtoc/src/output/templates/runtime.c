@@ -15,6 +15,8 @@ https://github.com/curiousdannii/if-decompiler
 #include "glulxtoc.h"
 #include <math.h>
 
+int iosys_mode;
+
 // From accel.c
 void init_accel(void) {}
 acceleration_func accel_find_func(glui32 index) { return NULL; }
@@ -254,8 +256,6 @@ void OP_STKROLL(glui32 arg0, glui32 arg1) {
 
 void OP_STREAMX_SAFE(int mode, glui32 val) {
     // Shortcut for safe streaming
-    glui32 iosys_mode, iosys_rock;
-    stream_get_iosys(&iosys_mode, &iosys_rock);
     if (iosys_mode != 1 /* iosys_Filter */) {
         switch (mode) {
             case STREAM_CHAR: (*stream_char_handler)(val & 0xFF); return;

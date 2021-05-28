@@ -29,9 +29,10 @@ extern int VM_FUNC_IS_SAFE_VARARGS(glui32 addr);
 extern glui32 VM_FUNC_SUBTRACT_HEADER(glui32 pc);
 extern glui32 VM_CALL_SAFE_FUNCTION_WITH_STACK_ARGS(glui32 addr, glui32 count);
 
-// image.c
+// image.data
 #define GLULX_IMAGE_LENGTH IMAGE_LENGTH_VALUE
-extern char GLULX_IMAGE[];
+extern char _binary_image_data_start[];
+#define GLULX_IMAGE _binary_image_data_start
 
 // runtime.c
 extern glui32 OP_DIV(glui32 arg1, glui32 arg2);

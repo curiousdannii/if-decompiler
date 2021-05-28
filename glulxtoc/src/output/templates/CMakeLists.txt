@@ -28,11 +28,19 @@ target_compile_definitions(glulxe PRIVATE OS_UNIX FLOAT_COMPILE_SAFER_POWF)
 target_compile_options(glulxe PRIVATE -Wall -Wmissing-prototypes -Wstrict-prototypes -Wno-unused)
 target_include_directories(glulxe PUBLIC WORKSPACE/upstream/glulxe/)
 
+# Prepare the image data as a library
+add_library(image STATIC image.o)
+set_target_properties(image PROPERTIES LINKER_LANGUAGE C)
+add_custom_command(OUTPUT image.o
+    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ld -r -b binary -o ${CMAKE_CURRENT_BINARY_DIR}/image.o image.data
+    COMMAND objcopy --rename-section .data=.rodata,alloc,load,readonly,data,contents ${CMAKE_CURRENT_BINARY_DIR}/image.o ${CMAKE_CURRENT_BINARY_DIR}/image.o)
+set_source_files_properties(image.o PROPERTIES EXTERNAL_OBJECT true GENERATED true)
+
 # And now our project
 add_executable(NAME)
-target_link_libraries(NAME cheapglk glulxe)
+target_link_libraries(NAME cheapglk glulxe image)
 add_sources(NAME "OUTDIR/"
-    SRCS functions_safe.c functions_unsafe.c image.c runtime.c unixstrt.c)
+    SRCS functions_safe.c functions_unsafe.c runtime.c unixstrt.c)
 target_compile_options(NAME PRIVATE -Wall -Wmissing-prototypes
     -Wstrict-prototypes -Wno-overflow -Wno-unused)
 if (CMAKE_C_COMPILER_ID MATCHES "Clang")

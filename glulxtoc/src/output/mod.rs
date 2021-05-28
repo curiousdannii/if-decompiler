@@ -22,7 +22,7 @@ mod files;
 mod functions_common;
 mod functions_safe;
 mod functions_unsafe;
-mod image;
+//mod image;
 
 pub struct GlulxOutput {
     pub disassemble_mode: bool,
@@ -65,8 +65,7 @@ impl GlulxOutput {
         // Make the output directory if necessary
         fs::create_dir_all(&self.out_dir)?;
 
-        self.output_from_templates(file.len())?;
-        self.output_image(file)?;
+        self.output_from_templates(file)?;
         self.output_safe_functions()?;
         self.output_unsafe_functions()?;
         Ok(())

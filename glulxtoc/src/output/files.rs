@@ -13,8 +13,13 @@ use super::*;
 use std::time::Instant;
 
 impl GlulxOutput {
-    pub fn output_from_templates(&self, file_length: usize) -> std::io::Result<()> {
+    pub fn output_from_templates(&self, data: &[u8]) -> std::io::Result<()> {
         let start = Instant::now();
+
+        // Output the image
+        let mut output_path = self.out_dir.clone();
+        output_path.push("image.data");
+        fs::write(output_path, data)?;
 
         let templates = [
             "CMakeLists.txt",
@@ -23,7 +28,7 @@ impl GlulxOutput {
             "unixstrt.c",
         ];
         let replacements = [
-            ["IMAGE_LENGTH_VALUE", &file_length.to_string()],
+            ["IMAGE_LENGTH_VALUE", &data.len().to_string()],
             ["NAME", &self.name],
             ["OUTDIR", self.out_dir.to_str().unwrap()],
             ["WORKSPACE", self.workspace_dir.to_str().unwrap()],

@@ -56,9 +56,15 @@ impl GlulxState {
 
                 // Strings - just skip past them for now!
                 0xE0 => {
+                    if self.stop_on_string {
+                        break;
+                    }
                     while cursor.get_u8() != 0 {}
                 },
                 0xE2 => {
+                    if self.stop_on_string {
+                        break;
+                    }
                     cursor.get_u8();
                     cursor.get_u8();
                     cursor.get_u8();
@@ -66,6 +72,10 @@ impl GlulxState {
                 },
                 // Compressed strings will take a bit more work...
                 0xE1 => {
+                    if self.stop_on_string {
+                        break;
+                    }
+
                     fn get_node<'a>(table: &'a FnvHashMap<u32, DecodingNode>, addr: u32) -> &'a DecodingNode {
                         table.get(&addr).unwrap()
                     }
@@ -111,7 +121,12 @@ impl GlulxState {
                 },
 
                 // Unknown
-                _ => {},
+                _ => {
+                    if self.stop_on_string {
+                        println!("Stopping on unknown object type {:?} at {:?}", object_type, addr);
+                        break;
+                    }
+                },
             }
         };
 
@@ -276,17 +291,24 @@ impl GlulxState {
                     for _ in entry_points.difference(&instruction_addresses) {
                         continue 'parse_loop;
                     }
-                    break;
+
+                    // And check for an unreachable instruction
+                    let final_addr = cursor.position();
+                    let potential_opcode = decode_opcode(cursor);
+                    cursor.set_position(final_addr);
+                    // Check for 0 first, as it shouldn't be interpreted as a NOP
+                    if potential_opcode == 0 {
+                        break;
+                    }
+                    match opcodes::operands_count(potential_opcode) {
+                        Some(_) => {
+                            entry_points.insert(final_addr as u32);
+                            continue 'parse_loop;
+                        },
+                        None => break,
+                    };
                 }
             }
-        }
-
-        // Check for a final unreachable return
-        let final_addr = cursor.position();
-        let next_byte = cursor.get_u8() as u32;
-        cursor.set_position(final_addr);
-        if next_byte == opcodes::OP_RETURN {
-            self.disassemble_instruction(cursor);
         }
 
         let safety = self.function_safety(addr, &instructions);
@@ -305,18 +327,11 @@ impl GlulxState {
         use Operand::*;
 
         let addr = cursor.position() as u32;
-        let opcode_byte = cursor.get_u8();
-
-        // Unpack the variable length opcode
-        let opcode = match opcode_byte {
-            0 ..= 0x7F => opcode_byte as u32,
-            0x80 ..= 0xBF => ((opcode_byte as u32 & 0x3F) << 8) | cursor.get_u8() as u32,
-            0xC0 ..= 0xFF => ((opcode_byte as u32 & 0x3F) << 24) | ((cursor.get_u8() as u32) << 16) | cursor.get_u16() as u32,
-        };
+        let opcode = decode_opcode(cursor);
 
         // Extract the operands
         let mut operands = Vec::default();
-        let operands_count = opcodes::operands_count(opcode, addr);
+        let operands_count = opcodes::operands_count(opcode).expect(&format!("Unknown opcode {} at address {}", opcode, addr)) as usize;
         let mut operand_types = Vec::default();
         while operand_types.len() < operands_count {
             let types = cursor.get_u8();
@@ -401,6 +416,16 @@ impl GlulxState {
             }
         }
         opcodes::function_safety(instructions)
+    }
+}
+
+// Decode a variable length opcode
+fn decode_opcode(cursor: &mut Cursor<&[u8]>) -> u32 {
+    let opcode_byte = cursor.get_u8();
+    match opcode_byte {
+        0 ..= 0x7F => opcode_byte as u32,
+        0x80 ..= 0xBF => ((opcode_byte as u32 & 0x3F) << 8) | cursor.get_u8() as u32,
+        0xC0 ..= 0xFF => ((opcode_byte as u32 & 0x3F) << 24) | ((cursor.get_u8() as u32) << 16) | cursor.get_u16() as u32,
     }
 }
 

@@ -39,8 +39,8 @@ struct Cli {
     out_dir: Option<PathBuf>,
 
     /// Stack size (MB) (for the glulxtoc app, not the stack of the Glulx file being decompiled)
-    #[structopt(short, long)]
-    stack_size: Option<u32>,
+    #[structopt(short, long, default_value = "8")]
+    stack_size: usize,
 
     /// Inform debug file
     #[structopt(long, parse(from_os_str))]
@@ -49,10 +49,6 @@ struct Cli {
     /// Disassembler mode - only disassemble, do not optimise or generate structured code
     #[structopt(short, long)]
     disassemble: bool,
-
-    /// Stop disassembling if you reach a string
-    #[structopt(long)]
-    stop_on_string: bool,
 
     /// Safe function overrides
     #[structopt(long, use_delimiter = true)]
@@ -69,7 +65,7 @@ fn main() -> Result<(), Box<std::io::Error>> {
 
     let child = thread::Builder::new()
         .name("run".into())
-        .stack_size((args.stack_size.unwrap_or(8) * 1024 * 1024) as usize)
+        .stack_size(args.stack_size * 1024 * 1024)
         .spawn(move || -> Result<(), Box<std::io::Error>> { run(args)?; Ok(()) })
         .unwrap();
 
@@ -142,7 +138,7 @@ fn run(args: Cli) -> Result<(), Box<std::io::Error>> {
     print!("Disassembling the storyfile...");
     io::stdout().flush().unwrap();
     let start_disassemble = Instant::now();
-    let mut decompiler = if_decompiler::glulx::GlulxState::new(debug_function_data, args.safe_function_overrides, args.stop_on_string, args.unsafe_function_overrides);
+    let mut decompiler = if_decompiler::glulx::GlulxState::new(debug_function_data, args.safe_function_overrides, true, args.unsafe_function_overrides);
     decompiler.decompile_rom(image.unwrap());
     let duration = start_disassemble.elapsed();
     println!(" completed in {:?}", duration);

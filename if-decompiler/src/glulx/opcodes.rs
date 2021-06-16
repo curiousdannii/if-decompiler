@@ -130,28 +130,28 @@ pub const OP_JISINF: u32 = 0x1C9;
 
 // Return the number of operands an opcode has
 // Also checks for unknown opcodes
-pub fn operands_count(opcode: u32, addr: u32) -> usize {
+pub fn operands_count(opcode: u32) -> Option<u8> {
     match opcode {
-        OP_NOP | OP_STKSWAP | OP_QUIT | OP_RESTART => 0,
+        OP_NOP | OP_STKSWAP | OP_QUIT | OP_RESTART => Some(0),
         OP_JUMP | OP_RETURN | OP_STKCOUNT | OP_STKCOPY
             | OP_STREAMCHAR ..= OP_STREAMUNICHAR | OP_DEBUGTRAP | OP_GETMEMSIZE
             | OP_JUMPABS | OP_SETRANDOM | OP_VERIFY | OP_SAVEUNDO | OP_RESTOREUNDO
-            | OP_GETSTRINGTBL | OP_SETSTRINGTBL | OP_MFREE => 1,
+            | OP_GETSTRINGTBL | OP_SETSTRINGTBL | OP_MFREE => Some(1),
         OP_NEG | OP_BITNOT | OP_JZ | OP_JNZ | OP_CATCH ..= OP_TAILCALL
             | OP_COPY ..= OP_SEXB | OP_STKPEEK | OP_STKROLL | OP_CALLF
             | OP_SETMEMSIZE | OP_RANDOM | OP_SAVE | OP_RESTORE | OP_PROTECT
             | OP_GETIOSYS | OP_SETIOSYS | OP_MZERO | OP_MALLOC | OP_ACCELFUNC
             | OP_ACCELPARAM | OP_NUMTOF ..= OP_FLOOR | OP_SQRT ..= OP_LOG
-            | OP_SIN ..= OP_ATAN | OP_JISNAN | OP_JISINF => 2,
+            | OP_SIN ..= OP_ATAN | OP_JISNAN | OP_JISINF => Some(2),
         OP_ADD ..= OP_MOD | OP_BITAND ..= OP_BITXOR  | OP_SHIFTL ..= OP_USHIFTR
             | OP_JEQ ..= OP_CALL | OP_ALOAD ..= OP_ASTOREBIT | OP_GESTALT
             | OP_GLK | OP_CALLFI | OP_MCOPY | OP_FADD ..= OP_FDIV | OP_POW
-            | OP_ATAN2 | OP_JFLT ..= OP_JFGE => 3,
-        OP_CALLFII | OP_FMOD | OP_JFEQ | OP_JFNE => 4,
-        OP_CALLFIII => 5,
-        OP_LINKEDSEARCH => 7,
-        OP_LINEARSEARCH | OP_BINARYSEARCH => 8,
-        _ => panic!("Unknown opcode {} at address {}", opcode, addr),
+            | OP_ATAN2 | OP_JFLT ..= OP_JFGE => Some(3),
+        OP_CALLFII | OP_FMOD | OP_JFEQ | OP_JFNE => Some(4),
+        OP_CALLFIII => Some(5),
+        OP_LINKEDSEARCH => Some(7),
+        OP_LINEARSEARCH | OP_BINARYSEARCH => Some(8),
+        _ => None,
     }
 }
 

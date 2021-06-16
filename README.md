@@ -1,10 +1,21 @@
-Limitations
------------
+Glulxtoc and IF-Decompiler
+==========================
 
-In general Glulxtoc is likely to have problems with any Glulx files that weren't compiled with Inform.
+In this repository you will find:
 
-- No functions in RAM
-- No 1 and 2 byte locals
-- Computed branch and jump offsets are only supported when you supply an Inform debug file
-- Inter-function branches are only supported when you manually set the target function as unsafe
-- State changing opcodes (save, restart, etc) within functions called by strings
+Glulxtoc
+--------
+
+Glulxtoc will decompile your Glulx storyfile into C code which you can then compile against any Glk library.
+
+[Glulxtoc installation and usage instructions](./glulxtoc/README.md).
+
+IF-Decompiler
+-------------
+
+Decompile various interactive fiction formats.
+
+Relooper
+--------
+
+Relooper turns unstructured branches and jumps into structured blocks.

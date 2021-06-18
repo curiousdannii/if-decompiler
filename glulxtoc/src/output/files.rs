@@ -57,6 +57,7 @@ impl GlulxOutput {
         let templates = [
             ("CMakeLists.txt", include_str!("templates/CMakeLists.txt")),
             ("glulxtoc.h", include_str!("templates/glulxtoc.h")),
+            ("LICENSE", include_str!("templates/LICENSE")),
             ("runtime.c", include_str!("templates/runtime.c")),
             ("unixstrt.c", include_str!("templates/unixstrt.c")),
         ];

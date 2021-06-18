@@ -37,18 +37,18 @@ impl GlulxOutput {
 #include <math.h>
 ")?;
 
-        let mut warn_about_dynamic_branches = false;
+        //let mut warn_about_dynamic_branches = false;
         let mut function_chunks = Vec::new();
 
         for (chunk_num, chunk) in self.unsafe_functions.chunks(1000).enumerate() {
             writeln!(code_file, "static int execute_chunk_{}(void) {{
     glui32 temp0, temp1, temp2, temp3, temp4, temp5;
     switch (pc) {{", chunk_num)?;
-            let (first_func, warn) = self.output_functions_chunk(&mut code_file, chunk)?;
+            let (first_func, _warn) = self.output_functions_chunk(&mut code_file, chunk)?;
             function_chunks.push(first_func);
-            if warn {
+            /*if warn {
                 warn_about_dynamic_branches = true;
-            }
+            }*/
             writeln!(code_file, "        default:
             // Try to recover - if we are jumping into the first address of a safe function we can tailcall it
             if (VM_JUMP_CALL(pc)) {{
@@ -96,9 +96,10 @@ impl GlulxOutput {
     }}
 }}", function_chunks.len())?;
 
-        if warn_about_dynamic_branches {
+        // I don't think this warning is needed anymore
+        /*if warn_about_dynamic_branches {
             println!("Warning ❗ This Glulx file features dynamic branches or jumps; please provide an Inform debug file.");
-        }
+        }*/
 
         let duration = start.elapsed();
         println!(" completed in {:?}", duration);

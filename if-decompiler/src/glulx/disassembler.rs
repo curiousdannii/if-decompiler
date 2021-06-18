@@ -122,10 +122,8 @@ impl GlulxState {
 
                 // Unknown
                 _ => {
-                    if self.stop_on_string {
-                        println!("Stopping on unknown object type {:?} at {:?}", object_type, addr);
-                        break;
-                    }
+                    println!("Stopping on unknown object type {:?} at {:?}", object_type, addr);
+                    break;
                 },
             }
         };

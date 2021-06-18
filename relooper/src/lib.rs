@@ -402,7 +402,7 @@ impl<L: RelooperLabel> Relooper<L> {
         for &node in sorted_nodes.iter() {
             let mut edges = self.graph.neighbors(node).detach();
             while let Some((edge, target)) = edges.next(&self.graph) {
-                if let Edge::MergedBranch | Edge::LoopBreak(_) = self.graph[edge] {
+                if let Edge::MergedBranch | Edge::MergedBranchIntoMulti | Edge::LoopBreak(_) | Edge::LoopBreakIntoMulti(_) = self.graph[edge] {
                     // Go through the node's dominators (including itself)
                     let mut change_to_multi = false;
                     let mut processed_nodes = Vec::new();

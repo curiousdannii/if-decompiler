@@ -286,7 +286,7 @@ fn aotearoa_461194() {
                     immediate: Some(Box::new(Multiple(MultipleBlock {
                         handled: vec![
                             basic_handled(461733, end_node(461733, None)),
-                            basic_handled(461736, end_node(461736, Some(branch_to(461945, MergedBranchIntoMulti)))),
+                            basic_handled(461736, end_node(461736, Some(branch_to(461945, SwitchFallThrough)))),
                         ],
                     }))),
                     branches: FnvHashMap::default(),
@@ -360,7 +360,7 @@ fn aotearoa_694077() {
                                                                 immediate: Some(Box::new(Multiple(MultipleBlock {
                                                                     handled: vec![
                                                                         basic_handled(694160, end_node(694160, Some(FnvHashMap::from_iter(vec![
-                                                                            (694167, MergedBranchIntoMulti),
+                                                                            (694167, SwitchFallThrough),
                                                                             (694257, SetLabelAndBreak),
                                                                         ])))),
                                                                     ],

@@ -116,7 +116,7 @@ fn looksub() {
                             branches: branch_to(3737, MergedBranchIntoMulti),
                             next: Some(Box::new(Multiple(MultipleBlock {
                                 handled: vec![
-                                    basic_handled_without_break(3737, end_node(3737, Some(branch_to(3761, MergedBranchIntoMulti)))),
+                                    basic_handled_without_break(3737, end_node(3737, Some(branch_to(3761, SwitchFallThrough)))),
                                     basic_handled(3761, Simple(SimpleBlock {
                                         label: 3761,
                                         immediate: Some(Box::new(Multiple(MultipleBlock {
@@ -241,7 +241,7 @@ fn tokenise() {
                         branches: branch_to(1156, MergedBranchIntoMulti),
                         next: Some(Box::new(Multiple(MultipleBlock {
                             handled: vec![
-                                basic_handled_without_break(1156, end_node(1156, Some(branch_to(1189, MergedBranchIntoMulti)))),
+                                basic_handled_without_break(1156, end_node(1156, Some(branch_to(1189, SwitchFallThrough)))),
                                 basic_handled(1189, end_node(1189, Some(branch_to(1139, LoopContinue(loop1139id))))),
                             ],
                         }))),
@@ -280,7 +280,7 @@ fn tokenise() {
                         branches: branch_to(1095, MergedBranchIntoMulti),
                         next: Some(Box::new(Multiple(MultipleBlock {
                             handled: vec![
-                                basic_handled_without_break(1095, end_node(1095, Some(branch_to(1130, MergedBranchIntoMulti)))),
+                                basic_handled_without_break(1095, end_node(1095, Some(branch_to(1130, SwitchFallThrough)))),
                                 basic_handled(1130, end_node(1130, Some(branch_to(1054, LoopContinue(loop1054id))))),
                             ],
                         }))),
@@ -409,7 +409,7 @@ fn tokenise() {
                     branches: branch_to(831, MergedBranchIntoMulti),
                     next: Some(Box::new(Multiple(MultipleBlock {
                         handled: vec![
-                            basic_handled_without_break(831, end_node(831, Some(branch_to(892, MergedBranchIntoMulti)))),
+                            basic_handled_without_break(831, end_node(831, Some(branch_to(892, SwitchFallThrough)))),
                             basic_handled(892, Simple(SimpleBlock {
                                 label: 892,
                                 immediate: Some(Box::new(Multiple(MultipleBlock {

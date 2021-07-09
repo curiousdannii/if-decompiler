@@ -120,7 +120,7 @@ fn revisemulti() {
                         branches: branch_to(21162, MergedBranchIntoMulti),
                         next: Some(loop21162),
                     })),
-                    basic_handled(21217, end_node(21217, Some(branch_to(21225, LoopBreakIntoMulti(loop21130id))))),
+                    basic_handled(21217, end_node(21217, Some(branch_to(21225, SwitchFallThrough)))),
                 ],
             }))),
             branches: FnvHashMap::default(),
@@ -638,7 +638,7 @@ fn scorematchl() {
                             branches: branch_to(21531, MergedBranchIntoMulti),
                             next: Some(Box::new(Multiple(MultipleBlock {
                                 handled: vec![
-                                    basic_handled_without_break(21531, end_node(21531, Some(branch_to(21539, MergedBranchIntoMulti)))),
+                                    basic_handled_without_break(21531, end_node(21531, Some(branch_to(21539, SwitchFallThrough)))),
                                     basic_handled(21539, Simple(SimpleBlock {
                                         label: 21539,
                                         immediate: Some(Box::new(loop21542)),

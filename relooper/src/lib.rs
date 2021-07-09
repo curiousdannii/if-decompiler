@@ -70,6 +70,7 @@ pub enum BranchMode {
     MergedBranch,
     MergedBranchIntoMulti,
     SetLabelAndBreak,
+    SwitchFallThrough,
 }
 
 #[derive(Debug, PartialEq)]
@@ -120,6 +121,7 @@ enum Edge<L> {
     MergedBranch,
     MergedBranchIntoMulti,
     SetLabelAndBreak,
+    SwitchFallThrough,
     Removed,
 }
 
@@ -136,7 +138,7 @@ fn filter_edges_including_processed<L>(edge: petgraph::graph::EdgeReference<Edge
     match edge.weight() {
         Forward | ForwardMulti(_) | Next(_) | ForwardMultiViaNext(_)
             | LoopBreak(_) | LoopBreakIntoMulti(_) | MergedBranch
-            | MergedBranchIntoMulti | SetLabelAndBreak => true,
+            | MergedBranchIntoMulti | SetLabelAndBreak | SwitchFallThrough => true,
         _ => false,
     }
 }
@@ -413,7 +415,9 @@ impl<L: RelooperLabel> Relooper<L> {
                                 if discovered.visit(node) {
                                     let mut edges = self.graph.neighbors(node).detach();
                                     'edges_loop: while let Some((edge, target)) = edges.next(&self.graph) {
+                                        // If the target is the next node, convert the edge to a SwitchFallThrough
                                         if target == next_node {
+                                            self.graph[edge] = Edge::SwitchFallThrough;
                                             continue;
                                         }
                                         match self.graph[edge] {
@@ -569,6 +573,7 @@ impl<L: RelooperLabel> Relooper<L> {
                     Edge::MergedBranch => { add_branch(target, BranchMode::MergedBranch); },
                     Edge::MergedBranchIntoMulti => { add_branch(target, BranchMode::MergedBranchIntoMulti); },
                     Edge::SetLabelAndBreak => { add_branch(target, BranchMode::SetLabelAndBreak); },
+                    Edge::SwitchFallThrough => { add_branch(target, BranchMode::SwitchFallThrough); },
                     Edge::Removed => {},
                 };
             }

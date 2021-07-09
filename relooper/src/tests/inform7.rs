@@ -300,3 +300,141 @@ fn aotearoa_461194() {
     let result = reloop(input461678, 461678);
     assert_eq!(result, block461678);
 }
+
+// A simplified version of function 694077 of Aotearoa (something to do with regexes I think)
+#[test]
+fn aotearoa_694077() {
+    let input694082 = vec![
+        (694082, vec![694086]),
+        (694086, vec![694093, 694327]),
+        (694093, vec![694111, 694257]),
+        (694111, vec![694122, 694257]),
+        (694122, vec![694147, 694153]),
+        (694147, vec![694153, 694167]),
+        (694153, vec![694160, 694257]),
+        (694160, vec![694167, 694257]),
+        (694167, vec![694251, 694257]),
+        (694251, vec![]),
+        (694257, vec![694267, 694317]),
+        (694267, vec![694286, 694317]),
+        (694286, vec![694305, 694311]),
+        (694305, vec![]),
+        (694311, vec![694317]),
+        (694317, vec![694086]),
+        (694327, vec![]),
+    ];
+
+    let loop694085id = 0;
+
+    let block694082 = Box::new(Simple(SimpleBlock {
+        label: 694082,
+        immediate: Some(Box::new(Loop(LoopBlock {
+            loop_id: loop694085id,
+            inner: Box::new(Simple(SimpleBlock {
+                label: 694086,
+                immediate: Some(Box::new(Multiple(MultipleBlock {
+                    handled: vec![
+                        basic_handled(694093, Simple(SimpleBlock {
+                            label: 694093,
+                            immediate: Some(Box::new(Multiple(MultipleBlock {
+                                handled: vec![
+                                    basic_handled(694111, Simple(SimpleBlock {
+                                        label: 694111,
+                                        immediate: Some(Box::new(Multiple(MultipleBlock {
+                                            handled: vec![
+                                                basic_handled(694122, Simple(SimpleBlock {
+                                                    label: 694122,
+                                                    immediate: Some(Box::new(Multiple(MultipleBlock {
+                                                        handled: vec![
+                                                            basic_handled(694147, end_node(694147, Some(FnvHashMap::from_iter(vec![
+                                                                (694153, MergedBranchIntoMulti),
+                                                                (694167, MergedBranchIntoMulti),
+                                                            ])))),
+                                                        ],
+                                                    }))),
+                                                    branches: branch_to(694153, MergedBranchIntoMulti),
+                                                    next: Some(Box::new(Multiple(MultipleBlock {
+                                                        handled: vec![
+                                                            basic_handled_without_break(694153, Simple(SimpleBlock {
+                                                                label: 694153,
+                                                                immediate: Some(Box::new(Multiple(MultipleBlock {
+                                                                    handled: vec![
+                                                                        basic_handled(694160, end_node(694160, Some(FnvHashMap::from_iter(vec![
+                                                                            (694167, MergedBranchIntoMulti),
+                                                                            (694257, SetLabelAndBreak),
+                                                                        ])))),
+                                                                    ],
+                                                                }))),
+                                                                branches: branch_to(694257, SetLabelAndBreak),
+                                                                next: None,
+                                                            })),
+                                                            basic_handled(694167, Simple(SimpleBlock {
+                                                                label: 694167,
+                                                                immediate: Some(Box::new(Multiple(MultipleBlock {
+                                                                    handled: vec![
+                                                                        basic_handled(694251, end_node(694251, None)),
+                                                                    ],
+                                                                }))),
+                                                                branches: branch_to(694257, MergedBranchIntoMulti),
+                                                                next: None,
+                                                            })),
+                                                        ],
+                                                    }))),
+                                                })),
+                                            ],
+                                        }))),
+                                        branches: branch_to(694257, MergedBranchIntoMulti),
+                                        next: None,
+                                    })),
+                                ],
+                            }))),
+                            branches: branch_to(694257, MergedBranchIntoMulti),
+                            next: Some(Box::new(Multiple(MultipleBlock {
+                                handled: vec![
+                                    basic_handled(694257, Simple(SimpleBlock {
+                                        label: 694257,
+                                        immediate: Some(Box::new(Multiple(MultipleBlock {
+                                            handled: vec![
+                                                basic_handled(694267, Simple(SimpleBlock {
+                                                    label: 694267,
+                                                    immediate: Some(Box::new(Multiple(MultipleBlock {
+                                                        handled: vec![
+                                                            basic_handled(694286, Simple(SimpleBlock {
+                                                                label: 694286,
+                                                                immediate: Some(Box::new(Multiple(MultipleBlock {
+                                                                    handled: vec![
+                                                                        basic_handled(694305, end_node(694305, None)),
+                                                                        basic_handled(694311, end_node(694311, Some(branch_to(694317, MergedBranch)))),
+                                                                    ],
+                                                                }))),
+                                                                branches: FnvHashMap::default(),
+                                                                next: None,
+                                                            })),
+                                                        ],
+                                                    }))),
+                                                    branches: branch_to(694317, MergedBranch),
+                                                    next: None,
+                                                })),
+                                            ],
+                                        }))),
+                                        branches: branch_to(694317, MergedBranch),
+                                        next: Some(Box::new(end_node(694317, Some(branch_to(694086, LoopContinue(loop694085id)))))),
+                                    })),
+                                ],
+                            }))),
+                        })),
+                        basic_handled(694327, end_node(694327, None)),
+                    ],
+                }))),
+                branches: FnvHashMap::default(),
+                next: None,
+            })),
+            next: None,
+        }))),
+        branches: FnvHashMap::default(),
+        next: None,
+    }));
+
+    let result = reloop(input694082, 694082);
+    assert_eq!(result, block694082);
+}

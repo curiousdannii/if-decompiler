@@ -601,5 +601,6 @@ fn output_branchmode(branch_mode: &BranchMode, addr: u32) -> String {
         LoopContinueIntoMulti(loop_id) => format!("label = {}; goto loop_{}_continue", addr, loop_id),
         MergedBranch => format!("/* Branch to {} continues below */", addr),
         MergedBranchIntoMulti => format!("label = {} /* Branch continues below */", addr),
+        SetLabelAndBreak => format!("label = {}; break /* Branch continues below */", addr),
     }
 }

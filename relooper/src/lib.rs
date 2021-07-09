@@ -69,6 +69,7 @@ pub enum BranchMode {
     LoopContinueIntoMulti(LoopId),
     MergedBranch,
     MergedBranchIntoMulti,
+    SetLabelAndBreak,
 }
 
 #[derive(Debug, PartialEq)]
@@ -118,6 +119,7 @@ enum Edge<L> {
     LoopContinueIntoMulti(LoopId),
     MergedBranch,
     MergedBranchIntoMulti,
+    SetLabelAndBreak,
     Removed,
 }
 
@@ -134,7 +136,7 @@ fn filter_edges_including_processed<L>(edge: petgraph::graph::EdgeReference<Edge
     match edge.weight() {
         Forward | ForwardMulti(_) | Next(_) | ForwardMultiViaNext(_)
             | LoopBreak(_) | LoopBreakIntoMulti(_) | MergedBranch
-            | MergedBranchIntoMulti => true,
+            | MergedBranchIntoMulti | SetLabelAndBreak => true,
         _ => false,
     }
 }
@@ -151,6 +153,14 @@ impl<L: RelooperLabel> Relooper<L> {
     fn new(blocks: Vec<(L, Vec<L>)>, root_label: L) -> Relooper<L> {
         let mut graph = Graph::new();
         let mut nodes = FnvHashMap::default();
+
+        // Check the blocks are sorted
+        // Replace with ._is_sorted() when stable (https://github.com/rust-lang/rust/issues/53485)
+        let mut label = blocks[0].0;
+        for block in &blocks[1..] {
+            assert!(block.0 > label, "Blocks were not provided in sorted order");
+            label = block.0;
+        }
 
         // Add a root node to the graph, in order to handle when the first label is a loop
         // Do this now so that it won't be invalidated by deleted orphan nodes
@@ -308,6 +318,7 @@ impl<L: RelooperLabel> Relooper<L> {
 
         // Get the list of nodes in topological order and the dominators list
         let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges_including_processed);
+        let mut space = algo::DfsSpace::new(&filtered_graph);
         let dominators = algo::dominators::simple_fast(&filtered_graph, self.graph_root);
         let sorted_nodes = algo::toposort(&filtered_graph, None).unwrap();
         let mut nodes_to_process = FnvHashMap::default();
@@ -374,10 +385,13 @@ impl<L: RelooperLabel> Relooper<L> {
 
             // Simple case - only one merged branch, branches that can't reach each other, or branches that only reach the next branch in order
             if !into_multi || self.can_merged_nodes_use_multiple(&dominated_nodes) {
-                for &node in dominated_nodes {
-                    // Add the next node
+                let dominated_nodes_count = dominated_nodes.len();
+                for index in 0..dominated_nodes_count {
+                    let node = dominated_nodes[index];
+                    let next_node = dominated_nodes.get(index + 1);
+                    // Add the next edge
                     self.graph.add_edge(dominator, node, Edge::Next(false));
-                    // Patch the exisiting incoming edges
+                    // Patch the existing incoming edges
                     let mut incoming_edges = self.graph.neighbors_directed(node, Incoming).detach();
                     while let Some((edge, _)) = incoming_edges.next(&self.graph) {
                         match self.graph[edge] {
@@ -385,6 +399,47 @@ impl<L: RelooperLabel> Relooper<L> {
                             Edge::LoopBreak(loop_id) => self.graph[edge] = if into_multi { Edge::LoopBreakIntoMulti(loop_id) } else { Edge::LoopBreak(loop_id) },
                             _ => {},
                         };
+                    }
+
+                    // Check if this node can reach the next
+                    if let Some(&next_node) = next_node {
+                        let filtered_graph = EdgeFiltered::from_fn(&self.graph, filter_edges_including_processed);
+                        if algo::has_path_connecting(&filtered_graph, node, next_node, Some(&mut space)) {
+                            // Turn any MergedBranch that go outside the dominator into SetLabelAndBreak edges
+                            // That means another manual search
+                            let mut stack = vec![node];
+                            let mut discovered = self.graph.visit_map();
+                            while let Some(node) = stack.pop() {
+                                if discovered.visit(node) {
+                                    let mut edges = self.graph.neighbors(node).detach();
+                                    'edges_loop: while let Some((edge, target)) = edges.next(&self.graph) {
+                                        if target == next_node {
+                                            continue;
+                                        }
+                                        match self.graph[edge] {
+                                            Edge::Forward | Edge::ForwardMulti(_) | Edge::Next(_) => {
+                                                if !discovered.is_visited(&target) {
+                                                    stack.push(target);
+                                                }
+                                            },
+                                            Edge::MergedBranch | Edge::MergedBranchIntoMulti => {
+                                                // If the target node is dominated by the top node then add it to the stack
+                                                let target_dominators = dominators.strict_dominators(target).unwrap();
+                                                for dom in target_dominators {
+                                                    if dom == node && !discovered.is_visited(&target) {
+                                                        stack.push(target);
+                                                        continue 'edges_loop;
+                                                    }
+                                                }
+                                                // This edge branches outside the top node, so convert to a SetLabelAndBreak
+                                                self.graph[edge] = Edge::SetLabelAndBreak;
+                                            },
+                                            _ => {},
+                                        };
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 continue;
@@ -419,9 +474,10 @@ impl<L: RelooperLabel> Relooper<L> {
                         let mut dominator_edges = self.graph.neighbors(dominator).detach();
                         while let Some((edge, target)) = dominator_edges.next(&self.graph) {
                             if let Edge::Next(_) = self.graph[edge] {
-                                next_nodes.push((edge, target));
+                                next_nodes.push(target);
                             }
                         }
+                        next_nodes.sort();
 
                         // No next nodes is fine
                         if next_nodes.len() == 0 {
@@ -429,7 +485,7 @@ impl<L: RelooperLabel> Relooper<L> {
                         }
                         // If there is one next node...
                         if next_nodes.len() == 1 {
-                            let next_target = next_nodes[0].1;
+                            let next_target = next_nodes[0];
                             // And it's the target, great!
                             if next_target == target {
                                 break 'dominator_loop;
@@ -456,7 +512,7 @@ impl<L: RelooperLabel> Relooper<L> {
                         // If there are 2+ next nodes
                         if next_nodes.len() > 1 {
                             // And the target is one of them, great!
-                            for (_, edge_target) in next_nodes {
+                            for &edge_target in &next_nodes {
                                 if edge_target == target {
                                     break 'dominator_loop;
                                 }
@@ -512,6 +568,7 @@ impl<L: RelooperLabel> Relooper<L> {
                     Edge::LoopContinueIntoMulti(loop_id) => { add_branch(target, BranchMode::LoopContinueIntoMulti(*loop_id)); },
                     Edge::MergedBranch => { add_branch(target, BranchMode::MergedBranch); },
                     Edge::MergedBranchIntoMulti => { add_branch(target, BranchMode::MergedBranchIntoMulti); },
+                    Edge::SetLabelAndBreak => { add_branch(target, BranchMode::SetLabelAndBreak); },
                     Edge::Removed => {},
                 };
             }
@@ -708,6 +765,7 @@ impl<L: RelooperLabel> Relooper<L> {
         let mut space = algo::DfsSpace::new(&filtered_graph);
         let mut handled = Vec::default();
         let entries_count = entries.len();
+        // TODO: require input to be sorted and just check instead?
         entries.sort();
         for index in 0..entries_count {
             let entry = entries[index];

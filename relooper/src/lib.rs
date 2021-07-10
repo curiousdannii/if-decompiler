@@ -70,7 +70,6 @@ pub enum BranchMode {
     MergedBranch,
     MergedBranchIntoMulti,
     SetLabelAndBreak,
-    SwitchFallThrough,
 }
 
 #[derive(Debug, PartialEq)]
@@ -570,10 +569,9 @@ impl<L: RelooperLabel> Relooper<L> {
                     Edge::LoopBreakIntoMulti(loop_id) => { add_branch(target, BranchMode::LoopBreakIntoMulti(*loop_id)); },
                     Edge::LoopContinue(loop_id) => { add_branch(target, BranchMode::LoopContinue(*loop_id)); },
                     Edge::LoopContinueIntoMulti(loop_id) => { add_branch(target, BranchMode::LoopContinueIntoMulti(*loop_id)); },
-                    Edge::MergedBranch => { add_branch(target, BranchMode::MergedBranch); },
+                    Edge::MergedBranch | Edge::SwitchFallThrough => { add_branch(target, BranchMode::MergedBranch); },
                     Edge::MergedBranchIntoMulti => { add_branch(target, BranchMode::MergedBranchIntoMulti); },
                     Edge::SetLabelAndBreak => { add_branch(target, BranchMode::SetLabelAndBreak); },
-                    Edge::SwitchFallThrough => { add_branch(target, BranchMode::SwitchFallThrough); },
                     Edge::Removed => {},
                 };
             }

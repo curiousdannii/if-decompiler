@@ -414,7 +414,7 @@ mod nested_branches {
             branches: branch_to(1095, MergedBranchIntoMulti),
             next: Some(Box::new(Multiple(MultipleBlock {
                 handled: vec![
-                    basic_handled_without_break(1095, end_node(1095, Some(branch_to(1130, SwitchFallThrough)))),
+                    basic_handled_without_break(1095, end_node(1095, Some(branch_to(1130, MergedBranch)))),
                     basic_handled(1130, end_node(1130, None)),
                 ],
             }))),

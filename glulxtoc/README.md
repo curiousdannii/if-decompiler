@@ -1,6 +1,8 @@
 Glulxtoc - Glulx to C decompiler
 ================================
 
+![Glulxtoc logo](glulxtoc-logo.png)
+
 Glulxtoc will decompile your Glulx storyfile into C code which you can then compile against any Glk library.
 
 To get it, first [install Rust](https://rustup.rs/) and then install glulxtoc with cargo:

@@ -13,4 +13,4 @@ repository = "https://github.com/curiousdannii/if-decompiler"
 [dependencies]
 bytes = "1.0.1"
 fnv = "1.0.7"
-petgraph = "0.5.1"
+petgraph = "0.6.0"

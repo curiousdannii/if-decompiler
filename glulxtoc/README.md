@@ -1,7 +1,7 @@
 Glulxtoc - Glulx to C decompiler
 ================================
 
-![Glulxtoc logo](glulxtoc-logo.png)
+![Glulxtoc logo](https://raw.githubusercontent.com/curiousdannii/if-decompiler/master/glulxtoc/glulxtoc-logo.png)
 
 Glulxtoc will decompile your Glulx storyfile into C code which you can then compile against any Glk library.
 
